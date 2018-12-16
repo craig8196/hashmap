@@ -1,7 +1,4 @@
-/**
- * @brief Tests that the correct code is returned if the map is full.
- * @note This test reduces the max size of the table using macros.
- */
+
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
@@ -22,12 +19,6 @@ intptr_eq_cb(void *el1, void *el2)
     return el1 == el2;
 }
 
-#define MAX_PRIME (11)
-
-#ifndef HASHMAP_BUCKET_COUNT
-#define HASHMAP_BUCKET_COUNT (4)
-#endif
-
 int
 main(void)
 {
@@ -35,9 +26,11 @@ main(void)
 
     hashmap_init(&map, 0, intptr_hash_cb, intptr_eq_cb);
 
+    void *out = NULL;
+    const int len = 1024;
     int size = 0;
     intptr_t i;
-    for (i = 0; i < MAX_PRIME * HASHMAP_BUCKET_COUNT; ++i)
+    for (i = 0; i < len; ++i)
     {
         assert(HASHCODE_OK == hashmap_insert(&map, (void *)i, NULL) && "Failed insert test");
         assert(HASHCODE_EXIST == hashmap_insert(&map, (void *)i, NULL) && "Failed double insert test");
@@ -45,10 +38,19 @@ main(void)
         assert(hashmap_contains(&map, (void *)i) && "Failed contains test");
         assert(size == hashmap_size(&map) && "Failed size test");
     }
-    printf("%s\n", "Passed inserting max number amount");
+    printf("%s\n", "Passed linearly inserting numbers");
 
-    assert(HASHCODE_NOSPACE == hashmap_insert(&map, (void *)i, NULL) && "Failed full insert test");
-    printf("%s\n", "Passed hashmap too full test");
+    for (i = 0; i < len; ++i)
+    {
+        out = (void *)(intptr_t)-1;
+        assert(hashmap_contains(&map, (void *)i) && "Failed contains test");
+        assert(HASHCODE_OK == hashmap_remove(&map, (void *)i, &out) && "Failed remove test");
+        assert((i == (intptr_t)out) && "Failed store item from remove");
+        --size;
+        assert(size == hashmap_size(&map) && "Failed size test");
+        assert(!hashmap_contains(&map, (void *)i) && "Failed contains test");
+    }
+    printf("%s\n", "Passed linearly removing numbers");
 
     hashmap_destroy(&map);
 
