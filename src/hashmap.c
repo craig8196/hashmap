@@ -491,26 +491,34 @@ hashmap_remove(hashmap_t *map,
 
                 // Backshift propagation.
                 hashmap_slot_t *dead = NULL;
+
                 for ( ; ; )
                 {
                     // Full bucket test, if the end bucket is full we continue.
                     // Otherwise, we do backshift and quit.
-                    if (LEADING_BIT & bucket->slots[HASHMAP_BUCKET_LAST].debt)
+                    if (LEADING_BIT & bucket->slots[HASHMAP_BUCKET_LAST].debt
+                        || HASHMAP_BUCKET_LAST == i)
                     {
                         dead = &bucket->slots[HASHMAP_BUCKET_LAST];
                     }
                     else
                     {
-                        if ((HASHMAP_BUCKET_LAST - 1) != i)
-                        {
-                            memmove(&bucket->slots[i],
-                                    &bucket->slots[i + 1],
-                                    sizeof(hashmap_slot_t)
-                                    * ((HASHMAP_BUCKET_LAST - 1) - i));
-                            bucket->slots[HASHMAP_BUCKET_LAST - 1].debt = 0;
+                        switch (i) {
+                            case 0:
+                                memmove(&bucket->slots[0],
+                                        &bucket->slots[1],
+                                        sizeof(hashmap_slot_t) * 2);
+                            break;
+                            case 1:
+                                memmove(&bucket->slots[1],
+                                        &bucket->slots[2],
+                                        sizeof(hashmap_slot_t));
+                            break;
+                            default:
+                            break;
                         }
 
-                        bucket->slots[HASHMAP_BUCKET_LAST].debt = 0;
+                        bucket->slots[HASHMAP_BUCKET_LAST - 1].debt = 0;
 
                         break;
                     }

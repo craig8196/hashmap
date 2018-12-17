@@ -15,14 +15,16 @@ extern "C" {
 #include <stdint.h>
 
 
-typedef enum hashcode_e {
+typedef enum hashcode_e
+{
     HASHCODE_OK      = 0,
     HASHCODE_STOP    = 1,
     HASHCODE_EXIST   = 2,
     HASHCODE_NOEXIST = 3,
     HASHCODE_NOMEM   = 4,
     HASHCODE_NOSPACE = 5,
-} hashcode_t;
+}
+hashcode_t;
 
 typedef uint32_t(*hashmap_hash_cb_t)(void *el);
 typedef bool(*hashmap_eq_cb_t)(void *el1, void *el2);
