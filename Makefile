@@ -33,31 +33,43 @@ all: $(OBJS)
 #	$(AR) 
 
 .PHONY: test
-test: test_simple test_linear test_nospace test_random
+test: test_simple test_linear test_nospace test_random test_large
 
 .PHONY: test_simple
 test_simple: $(OBJS)
-	@echo "START SIMPLE TEST"
 	$(CC) $(OPS) $(CFLAGS) $(IFLAGS) $(LIBS) $^ $(TDIR)/simple.c -o $(TDIR)/simple.o
+	@echo "START SIMPLE TEST"
 	@$(TDIR)/simple.o && echo "PASSED" || echo "FAILED"
 
 .PHONY: test_linear
 test_linear: $(OBJS)
-	@echo "START LINEAR TEST"
 	$(CC) $(OPS) $(CFLAGS) $(IFLAGS) $(LIBS) $^ $(TDIR)/linear.c -o $(TDIR)/linear.o
+	@echo "START LINEAR TEST"
 	@$(TDIR)/linear.o && echo "PASSED" || echo "FAILED"
 
 .PHONY: test_nospace
 test_nospace: $(SRC)
-	@echo "START NOSPACE TEST"
 	$(CC) $(OPS) $(CFLAGS) $(IFLAGS) $(LIBS) -DTEST_HASHMAP_NOSPACE $^ $(TDIR)/nospace.c -o $(TDIR)/nospace.o
+	@echo "START NOSPACE TEST"
 	@$(TDIR)/nospace.o && echo "PASSED" || echo "FAILED"
 
 .PHONY: test_random
 test_random: $(OBJS)
-	@echo "START RANDOM TEST"
 	$(CC) $(OPS) $(CFLAGS) $(IFLAGS) $(LIBS) $^ $(TDIR)/random.c -o $(TDIR)/random.o
+	@echo "START RANDOM TEST"
 	@$(TDIR)/random.o && echo "PASSED" || echo "FAILED"
+
+.PHONY: test_large
+test_large: $(OBJS)
+	$(CC) $(OPS) $(CFLAGS) $(IFLAGS) $(LIBS) $^ $(TDIR)/large.c -o $(TDIR)/large.o
+	@echo "START LARGE RANDOM TEST"
+	@$(TDIR)/large.o && echo "PASSED" || echo "FAILED"
+
+.PHONY: test_speed_insert
+test_speed_insert: $(OBJS)
+	$(CC) $(OPS) $(CFLAGS) $(IFLAGS) $(LIBS) $^ $(TDIR)/speed_insert.c -o $(TDIR)/speed_insert.o
+	@echo "START SPEED TEST"
+	@$(TDIR)/speed_insert.o && echo "PASSED" || echo "FAILED"
 
 .PHONY: clean
 clean:
