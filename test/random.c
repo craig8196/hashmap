@@ -31,14 +31,14 @@ typedef struct hashel_s
 } hashel_t;
 
 static uint32_t
-hash_cb(void *el)
+hash_cb(const void *el)
 {
     hashel_t *e = (hashel_t *)el;
     return (uint32_t)e->val;
 }
 
 static bool
-eq_cb(void *el1, void *el2)
+eq_cb(const void *el1, const void *el2)
 {
     hashel_t *e1 = (hashel_t *)el1;
     hashel_t *e2 = (hashel_t *)el2;

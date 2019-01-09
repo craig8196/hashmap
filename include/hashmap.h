@@ -26,8 +26,8 @@ typedef enum hashcode_e
 }
 hashcode_t;
 
-typedef uint32_t(*hashmap_hash_cb_t)(void *el);
-typedef bool(*hashmap_eq_cb_t)(void *el1, void *el2);
+typedef uint32_t(*hashmap_hash_cb_t)(const void *el);
+typedef bool(*hashmap_eq_cb_t)(const void *el1, const void *el2);
 typedef hashcode_t(*hashmap_iterate_cb_t)(void *ud, void *el);
 
 typedef struct hashmap_s hashmap_t;
@@ -45,6 +45,8 @@ hashmap_destroy(hashmap_t *map);
 // Queries
 int
 hashmap_size(hashmap_t *map);
+int
+hashmap_capacity(hashmap_t *map);
 bool
 hashmap_is_empty(hashmap_t *map);
 hashcode_t

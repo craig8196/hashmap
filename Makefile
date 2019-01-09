@@ -71,6 +71,12 @@ test_speed_insert: $(OBJS)
 	@echo "START SPEED TEST"
 	@$(TDIR)/speed_insert.o && echo "PASSED" || echo "FAILED"
 
+.PHONY: misc_checks
+misc_checks: $(OBJS)
+	$(CC) $(OPS) $(CFLAGS) $(IFLAGS) $(LIBS) $^ $(TDIR)/checks.c -o $(TDIR)/checks.o
+	@echo "START CHECKS"
+	@$(TDIR)/checks.o && echo "DONE" || echo "FAILED"
+
 .PHONY: clean
 clean:
 	@rm -rf $(ODIR) $(LDIR) $(TDIR)/*.o && echo "CLEANED!" || echo "FAILED TO CLEANUP!"

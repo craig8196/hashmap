@@ -376,6 +376,39 @@ hashmap_contains(hashmap_t *map,
     return HASHCODE_OK == hashmap_get(map, el, &save) ? true : false;
 }
 
+typedef hashcode_t(*hashmap_internal_iterate_cb_t)(void *ud, uint32_t hash, void *el);
+
+static hashcode_t
+hashmap_internal_iterate(hashmap_t *map,
+                         void *ud,
+                         hashmap_internal_iterate_cb_t iter_cb)
+{
+    // Algorithm:
+    //   For each full slot, call the callback with context and element.
+    int index;
+    int len = PRIMES[map->nslots_index];
+    for (index = 0; index < len; ++index)
+    {
+        hashmap_bucket_t *bucket = &map->buckets[index];
+        int i;
+        for (i = 0; i < HASHMAP_BUCKET_COUNT; ++i)
+        {
+            if ((LEADING_BIT & bucket->slots[i].debt))
+            {
+                hashcode_t code = iter_cb(ud,
+                                          bucket->slots[i].hash,
+                                          bucket->slots[i].el);
+                if (HASHCODE_OK != code)
+                {
+                    return code;
+                }
+            }
+        }
+    }
+
+    return HASHCODE_OK;
+}
+
 hashcode_t
 hashmap_iterate(hashmap_t *map,
                 void *ud,
@@ -416,28 +449,34 @@ hashmap_clear(hashmap_t *map)
 }
 
 static hashcode_t
-hashmap_internal_readd_cb(void *ud, void *el)
+hashmap_internal_insert(hashmap_t *map,
+                        uint32_t hash,
+                        void *el,
+                        void **upsert);
+
+static hashcode_t
+hashmap_internal_readd_cb(void *ud, uint32_t hash, void *el)
 {
     hashmap_t *map = (hashmap_t *)ud;
-    return hashmap_insert(map, el, NULL);
+    return hashmap_internal_insert(map, hash, el, NULL);
 }
 
-hashcode_t
-hashmap_insert(hashmap_t *map,
-               void *el,
-               void **upsert)
+static hashcode_t
+hashmap_internal_insert(hashmap_t *map,
+                        uint32_t hash,
+                        void *el,
+                        void **upsert)
 {
     // Algorithm:
     //   Similar to hashmap_get.
     //   If we hit the max hits length we reallocate.
     //   If reallocation isn't possible, we return an error.
+    // Trying a different method.
+    //int len = ((PRIMES_LEN - 1) == map->nslots_index) ? PRIMES[map->nslots_index] : map->max_hits;
     int debt;
     int index;
     bool which_len = (PRIMES_LEN - 1) == map->nslots_index;
     int len = (which_len*PRIMES[PRIMES_LAST]) + ((!which_len)*map->max_hits);
-    // Trying a different method.
-    //int len = ((PRIMES_LEN - 1) == map->nslots_index) ? PRIMES[map->nslots_index] : map->max_hits;
-    uint32_t hash = map->hash_cb(el);
     for (debt = 0,
          index = hashmap_internal_prime_modulo(map->nslots_index, hash);
          debt < len;
@@ -506,8 +545,9 @@ hashmap_insert(hashmap_t *map,
         {
             return error;
         }
-        hashcode_t code = hashmap_iterate(map,
-                                          &newmap, hashmap_internal_readd_cb);
+        hashcode_t code = hashmap_internal_iterate(map,
+                                                   &newmap,
+                                                   hashmap_internal_readd_cb);
         if (HASHCODE_OK != code)
         {
             return code;
@@ -518,6 +558,14 @@ hashmap_insert(hashmap_t *map,
     }
 
     return HASHCODE_NOSPACE;
+}
+
+hashcode_t
+hashmap_insert(hashmap_t *map,
+               void *el,
+               void **upsert)
+{
+    return hashmap_internal_insert(map, map->hash_cb(el), el, upsert);
 }
 
 hashcode_t

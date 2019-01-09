@@ -7,14 +7,14 @@
 
 
 static uint32_t
-intptr_hash_cb(void *el)
+intptr_hash_cb(const void *el)
 {
     intptr_t x = (intptr_t)el;
     return (uint32_t)x;
 }
 
 static bool
-intptr_eq_cb(void *el1, void *el2)
+intptr_eq_cb(const void *el1, const void *el2)
 {
     return el1 == el2;
 }
