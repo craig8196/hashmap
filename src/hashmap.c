@@ -12,6 +12,8 @@
 #include <stdio.h>
 
 
+typedef hashcode_t(*hashmap_internal_iterate_cb_t)(void *ud, uint32_t hash, void *el);
+
 // TODO perform more reliable insert speed test
 //TODO the increase in size is inefficient because the hash is called again!!
 // reduce the cost by iterating manually!!
@@ -89,63 +91,63 @@ hashmap_internal_prime_modulo(int prime_index, uint32_t index)
     switch (prime_index)
     {
         case 0: index = 0; break;
-        case 1: index = index % 3; break;
-        case 2: index = index % 5; break;
-        case 3: index = index % 7; break;
-        case 4: index = index % 11; break;
+        case 1: index = index % (uint32_t)3; break;
+        case 2: index = index % (uint32_t)5; break;
+        case 3: index = index % (uint32_t)7; break;
+        case 4: index = index % (uint32_t)11; break;
 #ifndef TEST_HASHMAP_NOSPACE
-        case 5: index = index % 17; break;
-        case 6: index = index % 23; break;
-        case 7: index = index % 29; break;
-        case 8: index = index % 41; break;
-        case 9: index = index % 59; break;
-        case 10: index = index % 83; break;
-        case 11: index = index % 113; break;
-        case 12: index = index % 157; break;
-        case 13: index = index % 223; break;
-        case 14: index = index % 307; break;
-        case 15: index = index % 431; break;
-        case 16: index = index % 599; break;
-        case 17: index = index % 839; break;
-        case 18: index = index % 1181; break;
-        case 19: index = index % 1657; break;
-        case 20: index = index % 2297; break;
-        case 21: index = index % 3217; break;
-        case 22: index = index % 4507; break;
-        case 23: index = index % 6301; break;
-        case 24: index = index % 8821; break;
-        case 25: index = index % 12373; break;
-        case 26: index = index % 17291; break;
-        case 27: index = index % 24203; break;
-        case 28: index = index % 33889; break;
-        case 29: index = index % 47441; break;
-        case 30: index = index % 66413; break;
-        case 31: index = index % 92987; break;
-        case 32: index = index % 130171; break;
-        case 33: index = index % 182233; break;
-        case 34: index = index % 255121; break;
-        case 35: index = index % 357169; break;
-        case 36: index = index % 500029; break;
-        case 37: index = index % 700057; break;
-        case 38: index = index % 980069; break;
-        case 39: index = index % 1387649; break;
-        case 40: index = index % 1923127; break;
-        case 41: index = index % 2691401; break;
-        case 42: index = index % 3766703; break;
-        case 43: index = index % 5276969; break;
-        case 44: index = index % 7385767; break;
-        case 45: index = index % 10332557; break;
-        case 46: index = index % 14484739; break;
-        case 47: index = index % 20253691; break;
-        case 48: index = index % 28352173; break;
-        case 49: index = index % 39688177; break;
-        case 50: index = index % 55572581; break;
-        case 51: index = index % 77792227; break;
-        case 52: index = index % 108908411; break;
-        case 53: index = index % 152471503; break;
-        case 54: index = index % 213461819; break;
-        case 55: index = index % 298836649; break;
-        case 56: index = index % 418363973; break;
+        case 5: index = index % (uint32_t)17; break;
+        case 6: index = index % (uint32_t)23; break;
+        case 7: index = index % (uint32_t)29; break;
+        case 8: index = index % (uint32_t)41; break;
+        case 9: index = index % (uint32_t)59; break;
+        case 10: index = index % (uint32_t)83; break;
+        case 11: index = index % (uint32_t)113; break;
+        case 12: index = index % (uint32_t)157; break;
+        case 13: index = index % (uint32_t)223; break;
+        case 14: index = index % (uint32_t)307; break;
+        case 15: index = index % (uint32_t)431; break;
+        case 16: index = index % (uint32_t)599; break;
+        case 17: index = index % (uint32_t)839; break;
+        case 18: index = index % (uint32_t)1181; break;
+        case 19: index = index % (uint32_t)1657; break;
+        case 20: index = index % (uint32_t)2297; break;
+        case 21: index = index % (uint32_t)3217; break;
+        case 22: index = index % (uint32_t)4507; break;
+        case 23: index = index % (uint32_t)6301; break;
+        case 24: index = index % (uint32_t)8821; break;
+        case 25: index = index % (uint32_t)12373; break;
+        case 26: index = index % (uint32_t)17291; break;
+        case 27: index = index % (uint32_t)24203; break;
+        case 28: index = index % (uint32_t)33889; break;
+        case 29: index = index % (uint32_t)47441; break;
+        case 30: index = index % (uint32_t)66413; break;
+        case 31: index = index % (uint32_t)92987; break;
+        case 32: index = index % (uint32_t)130171; break;
+        case 33: index = index % (uint32_t)182233; break;
+        case 34: index = index % (uint32_t)255121; break;
+        case 35: index = index % (uint32_t)357169; break;
+        case 36: index = index % (uint32_t)500029; break;
+        case 37: index = index % (uint32_t)700057; break;
+        case 38: index = index % (uint32_t)980069; break;
+        case 39: index = index % (uint32_t)1387649; break;
+        case 40: index = index % (uint32_t)1923127; break;
+        case 41: index = index % (uint32_t)2691401; break;
+        case 42: index = index % (uint32_t)3766703; break;
+        case 43: index = index % (uint32_t)5276969; break;
+        case 44: index = index % (uint32_t)7385767; break;
+        case 45: index = index % (uint32_t)10332557; break;
+        case 46: index = index % (uint32_t)14484739; break;
+        case 47: index = index % (uint32_t)20253691; break;
+        case 48: index = index % (uint32_t)28352173; break;
+        case 49: index = index % (uint32_t)39688177; break;
+        case 50: index = index % (uint32_t)55572581; break;
+        case 51: index = index % (uint32_t)77792227; break;
+        case 52: index = index % (uint32_t)108908411; break;
+        case 53: index = index % (uint32_t)152471503; break;
+        case 54: index = index % (uint32_t)213461819; break;
+        case 55: index = index % (uint32_t)298836649; break;
+        case 56: index = index % (uint32_t)418363973; break;
 #endif
     }
 
@@ -383,6 +385,37 @@ hashmap_contains(hashmap_t *map,
     return HASHCODE_OK == hashmap_get(map, el, &save) ? true : false;
 }
 
+static hashcode_t
+hashmap_internal_iterate(hashmap_t *map,
+                         void *ud,
+                         hashmap_internal_iterate_cb_t iter_cb)
+{
+    // Algorithm:
+    //   For each full slot, call the callback with context and element.
+    int index;
+    int len = PRIMES[map->nslots_index];
+    for (index = 0; index < len; ++index)
+    {
+        hashmap_bucket_t *bucket = &map->buckets[index];
+        int i;
+        for (i = 0; i < HASHMAP_BUCKET_COUNT; ++i)
+        {
+            if ((LEADING_BIT & bucket->slots[i].debt))
+            {
+                hashcode_t code = iter_cb(ud,
+                                          bucket->slots[i].hash,
+                                          bucket->slots[i].el);
+                if (HASHCODE_OK != code)
+                {
+                    return code;
+                }
+            }
+        }
+    }
+
+    return HASHCODE_OK;
+}
+
 hashcode_t
 hashmap_iterate(hashmap_t *map,
                 void *ud,
@@ -422,17 +455,25 @@ hashmap_clear(hashmap_t *map)
            (size_t)PRIMES[map->nslots_index] * sizeof(hashmap_bucket_t));
 }
 
+
 static hashcode_t
-hashmap_internal_readd_cb(void *ud, void *el)
+hashmap_internal_insert(hashmap_t *map,
+                        uint32_t hash,
+                        void *el,
+                        void **upsert);
+
+static hashcode_t
+hashmap_internal_readd_cb(void *ud, uint32_t hash, void *el)
 {
     hashmap_t *map = (hashmap_t *)ud;
-    return hashmap_insert(map, el, NULL);
+    return hashmap_internal_insert(map, hash, el, NULL);
 }
 
-hashcode_t
-hashmap_insert(hashmap_t *map,
-               void *el,
-               void **upsert)
+static hashcode_t
+hashmap_internal_insert(hashmap_t *map,
+                        uint32_t hash,
+                        void *el,
+                        void **upsert)
 {
     // Algorithm:
     //   Similar to hashmap_get.
@@ -441,12 +482,14 @@ hashmap_insert(hashmap_t *map,
     int debt;
     int index;
     int len = map->max_hits;
-    uint32_t hash = map->hash_cb(el);
     for (debt = 0,
          index = hashmap_internal_prime_modulo(map->nslots_index, hash);
          debt < len;
          ++debt,
+         index = (index + 1) < PRIMES[map->nslots_index] ? (index + 1) : 0)
+#if 0
          index = hashmap_internal_prime_modulo(map->nslots_index, (uint32_t)(index + 1)))
+#endif
     {
         hashmap_bucket_t *bucket = &map->buckets[index];
         int i;
@@ -510,8 +553,9 @@ hashmap_insert(hashmap_t *map,
         {
             return error;
         }
-        hashcode_t code = hashmap_iterate(map,
-                                          &newmap, hashmap_internal_readd_cb);
+        hashcode_t code = hashmap_internal_iterate(map,
+                                                   &newmap,
+                                                   hashmap_internal_readd_cb);
         if (HASHCODE_OK != code)
         {
             return code;
@@ -522,6 +566,15 @@ hashmap_insert(hashmap_t *map,
     }
 
     return HASHCODE_NOSPACE;
+}
+
+hashcode_t
+hashmap_insert(hashmap_t *map,
+               void *el,
+               void **upsert)
+{
+    uint32_t hash = map->hash_cb(el);
+    return hashmap_internal_insert(map, hash, el, upsert);
 }
 
 hashcode_t
