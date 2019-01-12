@@ -71,6 +71,12 @@ test_speed_insert: $(OBJS)
 	@echo "START SPEED TEST"
 	@$(TDIR)/speed_insert.o && echo "PASSED" || echo "FAILED"
 
+.PHONY: test_speed_insert2
+test_speed_insert2: $(OBJS)
+	$(CC) $(OPS) $(CFLAGS) $(IFLAGS) $(LIBS) $^ $(TDIR)/speed_insert2.c -o $(TDIR)/speed_insert2.o
+	@echo "START SPEED TEST #2"
+	@$(TDIR)/speed_insert2.o && echo "PASSED" || echo "FAILED"
+
 .PHONY: misc_checks
 misc_checks: $(OBJS)
 	$(CC) $(OPS) $(CFLAGS) $(IFLAGS) $(LIBS) $^ $(TDIR)/checks.c -o $(TDIR)/checks.o

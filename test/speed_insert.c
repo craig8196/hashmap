@@ -100,7 +100,7 @@ main(void)
     int k;
     for (k = 0; k < len; ++k)
     {
-        hashel_t *el = &els[i];
+        hashel_t *el = &els[k];
         hashmap_insert(&map, el, NULL);
     }
 

@@ -8,6 +8,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+// TODO remove
+#include <stdio.h>
+
 
 // TODO perform more reliable insert speed test
 //TODO the increase in size is inefficient because the hash is called again!!
@@ -174,7 +177,7 @@ hashmap_internal_determine_prime_index(int nslots)
             {
                 return mid;
             }
-            else if (nbuckets <= PRIMES[mid])
+            else if (nbuckets < PRIMES[mid])
             {
                 end = mid - 1;
             }
@@ -188,7 +191,7 @@ hashmap_internal_determine_prime_index(int nslots)
 }
 
 static int
-hashmap_internal_log2(int num)
+hashmap_internal_log2(unsigned int num)
 {
     int count = 0;
 
@@ -209,7 +212,14 @@ hashmap_internal_init(hashmap_t *map,
 {
     memset(map, 0, sizeof(hashmap_t));
     map->nslots_index = nslots_index;
-    map->max_hits = hashmap_internal_log2(PRIMES[map->nslots_index]) * 2;
+    if (PRIMES_LAST == map->nslots_index)
+    {
+        map->max_hits = PRIMES[PRIMES_LAST];
+    }
+    else
+    {
+        map->max_hits = hashmap_internal_log2((unsigned int)PRIMES[map->nslots_index]) * 2;
+    }
     map->hash_cb = hash_cb;
     map->eq_cb = eq_cb;
 
@@ -326,10 +336,7 @@ hashmap_get(hashmap_t *map,
     //   If bucket is full and not found, proceed to next bucket by offset of 1.
     int debt;
     int index;
-    bool which_len = (PRIMES_LEN - 1) == map->nslots_index;
-    int len = (which_len*PRIMES[PRIMES_LAST]) + ((!which_len)*map->max_hits);
-    // Trying a different method.
-    //int len = ((PRIMES_LEN - 1) == map->nslots_index) ? PRIMES[map->nslots_index] : map->max_hits;
+    int len = map->max_hits;
     const uint32_t hash = map->hash_cb(el);
     for (debt = 0,
          index = hashmap_internal_prime_modulo(map->nslots_index, hash);
@@ -433,10 +440,7 @@ hashmap_insert(hashmap_t *map,
     //   If reallocation isn't possible, we return an error.
     int debt;
     int index;
-    bool which_len = (PRIMES_LEN - 1) == map->nslots_index;
-    int len = (which_len*PRIMES[PRIMES_LAST]) + ((!which_len)*map->max_hits);
-    // Trying a different method.
-    //int len = ((PRIMES_LEN - 1) == map->nslots_index) ? PRIMES[map->nslots_index] : map->max_hits;
+    int len = map->max_hits;
     uint32_t hash = map->hash_cb(el);
     for (debt = 0,
          index = hashmap_internal_prime_modulo(map->nslots_index, hash);
@@ -532,10 +536,7 @@ hashmap_remove(hashmap_t *map,
     //   If found, commence robin hooding.
     int debt;
     int index;
-    bool which_len = (PRIMES_LEN - 1) == map->nslots_index;
-    int len = (which_len*PRIMES[PRIMES_LAST]) + ((!which_len)*map->max_hits);
-    // Trying a different method.
-    //int len = ((PRIMES_LEN - 1) == map->nslots_index) ? PRIMES[map->nslots_index] : map->max_hits;
+    int len = map->max_hits;
     uint32_t hash = map->hash_cb(el);
     for (debt = 0,
          index = hashmap_internal_prime_modulo(map->nslots_index, hash);

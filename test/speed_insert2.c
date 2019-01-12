@@ -54,13 +54,12 @@ main(void)
     
     hashmap_t map;
 
-    hashmap_init(&map, 0, hash_cb, eq_cb);
-
-    const int max_len = 10000000;
-    int len = myrand(1, max_len);
+    const int max_iter = 1024*1024;
+    const int max_len = 1024;
+    int len = max_len;
     hashel_t *els = calloc(len, sizeof(hashel_t));
-    int step = myrand(1, 5);
-    int lowval = myrand(-max_len, 0);
+    int step = myrand(1, 100000);
+    int lowval = myrand(-1000000, 0);
     int nextval = lowval;
 
     // Generate random values.
@@ -91,17 +90,24 @@ main(void)
     struct timespec start;
     struct timespec end;
 
+    hashmap_init(&map, len, hash_cb, eq_cb);
+
     if (clock_gettime(CLOCK_REALTIME, &start))
     {
         printf("Error getting start time: %d, %s\n", errno, strerror(errno));
         return errno;
     }
 
-    int k;
-    for (k = 0; k < len; ++k)
+    int j;
+    for (j = 0; j < max_iter; ++j)
     {
-        hashel_t *el = &els[i];
-        hashmap_insert(&map, el, NULL);
+        int k;
+        for (k = 0; k < len; ++k)
+        {
+            hashel_t *el = &els[k];
+            hashmap_insert(&map, el, NULL);
+        }
+        hashmap_clear(&map);
     }
 
     if (clock_gettime(CLOCK_REALTIME, &end))
@@ -110,11 +116,12 @@ main(void)
         return errno;
     }
 
+    hashmap_destroy(&map);
+
     double seconds = (double)(end.tv_sec - start.tv_sec) + ((double)end.tv_nsec - (double)start.tv_nsec)/1000000000;
 
-    printf("Passed inserting [%d] items in [%f] seconds or [%f per second]\n", len, seconds, ((double)len/seconds));
-
-    hashmap_destroy(&map);
+    int totallen = len * max_iter;
+    printf("Passed inserting [%d] items in [%f] seconds or [%f per second]\n", totallen, seconds, ((double)totallen/seconds));
 
     return 0;
 }
