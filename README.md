@@ -8,7 +8,7 @@ A hashmap implementation in C.
  * Buckets that are cache aligned to 64 bytes on 64 bit intel arch.
    Also, buckets of a fixed size should give some good loop unrolling.
  * Storage of hash and "debt" in attempt to prevent additional computations.
- * Max probe of floor(log2(maxsize)) before realloc.
+ * Max probe of floor(log2(table_size)) before realloc.
  * Robin hooding.
 
 ## Testing
@@ -20,6 +20,15 @@ space return code.
 The fourth, random.c, implements random testing to vet and remove remaining flaws.
 The fifth, large.c, implements random testing using millions of entries.
 The sixth, speed_insert.c, runs a simple performance test for insertions.
+
+Run with different optimizations:
+```
+make all ops=3 # Will set flag -O3
+```
+Run a test with profiling and a specific target:
+```
+make test prof=true testtarget=speed_insert2
+```
 
 ## Further Work
  * [ ] Compare with other hashmap implementations.

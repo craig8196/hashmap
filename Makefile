@@ -9,10 +9,30 @@ TDIR = ./test
 ODIR = ./obj
 LDIR = ./lib
 
+PROF = 
+ifdef prof
+ifeq ($(prof), true)
+PROF += -fprofile-arcs -ftest-coverage
+endif
+endif
+
+OPS = -O2
+ifdef ops
+ifneq ($(strip $(ops)),)
+	OPS = -O$(ops)
+endif
+endif
+
+TESTFILE =simple
+ifdef testtarget
+ifneq ($(strip $(testtarget)),)
+	TESTFILE =$(testtarget)
+endif
+endif
+
 AR = ar
 CC = gcc
-CFLAGS = -Wall -Wextra -Werror
-OPS = -g -O2
+CFLAGS = -Wall -Wextra -Werror -pedantic -g $(DEBUG) $(OPS) $(PROF)
 IFLAGS = -I$(IDIR)
 
 LIBS =
@@ -26,64 +46,32 @@ dirs:
 	@mkdir -p $(ODIR) $(LDIR) || echo "FAILED TO MAKE DIRECTORIES!"
 
 $(ODIR)/%.o: $(SDIR)/%.c dirs
-	$(CC) $(CFLAGS) $(IFLAGS) $(OPS) -c $< -o $@
+	$(CC) $(CFLAGS) $(IFLAGS) -c $< -o $@
 
 all: $(OBJS)
-	echo "TODO create a static or dynamic library"
-#	$(AR) 
+	ar rcs $(LDIR)/libhashmap.a $(OBJS)
+	$(CC) $(CFLAGS) $(IFLAGS) -c $(SRC) -shared -o $(LDIR)/libhashmap.so
 
 .PHONY: test
-test: test_simple test_linear test_nospace test_random test_large
-
-.PHONY: test_simple
-test_simple: $(OBJS)
-	$(CC) $(OPS) $(CFLAGS) $(IFLAGS) $(LIBS) $^ $(TDIR)/simple.c -o $(TDIR)/simple.o
-	@echo "START SIMPLE TEST"
-	@$(TDIR)/simple.o && echo "PASSED" || echo "FAILED"
-
-.PHONY: test_linear
-test_linear: $(OBJS)
-	$(CC) $(OPS) $(CFLAGS) $(IFLAGS) $(LIBS) $^ $(TDIR)/linear.c -o $(TDIR)/linear.o
-	@echo "START LINEAR TEST"
-	@$(TDIR)/linear.o && echo "PASSED" || echo "FAILED"
-
-.PHONY: test_nospace
-test_nospace: $(SRC)
-	$(CC) $(OPS) $(CFLAGS) $(IFLAGS) $(LIBS) -DTEST_HASHMAP_NOSPACE $^ $(TDIR)/nospace.c -o $(TDIR)/nospace.o
-	@echo "START NOSPACE TEST"
-	@$(TDIR)/nospace.o && echo "PASSED" || echo "FAILED"
-
-.PHONY: test_random
-test_random: $(OBJS)
-	$(CC) $(OPS) $(CFLAGS) $(IFLAGS) $(LIBS) $^ $(TDIR)/random.c -o $(TDIR)/random.o
-	@echo "START RANDOM TEST"
-	@$(TDIR)/random.o && echo "PASSED" || echo "FAILED"
-
-.PHONY: test_large
-test_large: $(OBJS)
-	$(CC) $(OPS) $(CFLAGS) $(IFLAGS) $(LIBS) $^ $(TDIR)/large.c -o $(TDIR)/large.o
-	@echo "START LARGE RANDOM TEST"
-	@$(TDIR)/large.o && echo "PASSED" || echo "FAILED"
-
-.PHONY: test_speed_insert
-test_speed_insert: $(OBJS)
-	$(CC) $(OPS) $(CFLAGS) $(IFLAGS) $(LIBS) $^ $(TDIR)/speed_insert.c -o $(TDIR)/speed_insert.o
-	@echo "START SPEED TEST"
-	@$(TDIR)/speed_insert.o && echo "PASSED" || echo "FAILED"
-
-.PHONY: test_speed_insert2
-test_speed_insert2: $(OBJS)
-	$(CC) $(OPS) $(CFLAGS) $(IFLAGS) $(LIBS) $^ $(TDIR)/speed_insert2.c -o $(TDIR)/speed_insert2.o
-	@echo "START SPEED TEST #2"
-	@$(TDIR)/speed_insert2.o && echo "PASSED" || echo "FAILED"
+test: $(OBJS)
+	$(CC) $(CFLAGS) $(IFLAGS) $(LIBS) $^ $(TDIR)/$(TESTFILE).c -o $(TDIR)/$(TESTFILE).o
+	@echo "START TEST: $(TESTFILE)"
+	@$(TDIR)/$(TESTFILE).o && echo "PASSED" || echo "FAILED"
+ifdef prof
+ifeq ($(prof), true)
+	@gcov -m hashmap.c
+	@lcov --capture --directory obj --output-file main_coverage.info
+	@genhtml main_coverage.info --output-directory out
+endif
+endif
 
 .PHONY: misc_checks
 misc_checks: $(OBJS)
-	$(CC) $(OPS) $(CFLAGS) $(IFLAGS) $(LIBS) $^ $(TDIR)/checks.c -o $(TDIR)/checks.o
+	$(CC) $(CFLAGS) $(IFLAGS) $(LIBS) $^ $(TDIR)/checks.c -o $(TDIR)/checks.o
 	@echo "START CHECKS"
 	@$(TDIR)/checks.o && echo "DONE" || echo "FAILED"
 
 .PHONY: clean
 clean:
-	@rm -rf $(ODIR) $(LDIR) $(TDIR)/*.o && echo "CLEANED!" || echo "FAILED TO CLEANUP!"
+	@rm -rf $(ODIR) $(LDIR) $(TDIR)/*.o out/ gmon.out *.info *.gcda *.gcno && echo "CLEANED!" || echo "FAILED TO CLEANUP!"
 

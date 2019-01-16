@@ -7,18 +7,12 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
-
-// TODO remove
-#include <stdio.h>
+#include <limits.h>
 
 
 typedef hashcode_t(*hashmap_internal_iterate_cb_t)(void *ud, uint32_t hash, void *el);
 
-// TODO perform more reliable insert speed test
-//TODO the increase in size is inefficient because the hash is called again!!
-// reduce the cost by iterating manually!!
-
-static const int LEADING_BIT = 1 << ((sizeof(int) * 8) - 1);
+static const int LEADING_BIT = UINT_MAX ^ INT_MAX;
 static const int CLEAR_LEADING_BIT = ~(1 << ((sizeof(int) * 8) - 1));
 static const int PRIMES[] =
 {
@@ -504,17 +498,6 @@ hashmap_internal_insert(hashmap_t *map,
 
                 return HASHCODE_OK;
             }
-            else if (bucket->slots[i].hash == hash
-                     && map->eq_cb(el, bucket->slots[i].el))
-            {
-                if (NULL != upsert)
-                {
-                    (*upsert) = bucket->slots[i].el;
-                    bucket->slots[i].el = el;
-                }
-
-                return HASHCODE_EXIST;
-            }
             else if ((CLEAR_LEADING_BIT & bucket->slots[i].debt) < debt)
             {
                 // Steal from the rich.
@@ -528,6 +511,17 @@ hashmap_internal_insert(hashmap_t *map,
                 hash = tmphash;
                 el = tmpel;
                 upsert = NULL;
+            }
+            else if (bucket->slots[i].hash == hash
+                     && map->eq_cb(el, bucket->slots[i].el))
+            {
+                if (NULL != upsert)
+                {
+                    (*upsert) = bucket->slots[i].el;
+                    bucket->slots[i].el = el;
+                }
+
+                return HASHCODE_EXIST;
             }
             else
             {
