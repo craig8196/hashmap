@@ -25,6 +25,12 @@ Run with different optimizations:
 ```
 make all ops=3 # Will set flag -O3
 ```
+
+Run the nospace test:
+```
+make test testtarget=nospace nospace=true
+```
+
 Run a test with profiling and a specific target:
 ```
 make test prof=true testtarget=speed_insert2

@@ -30,6 +30,11 @@ ifneq ($(strip $(testtarget)),)
 endif
 endif
 
+DEFINES =
+ifdef nospace
+	DEFINES = -DTEST_HASHMAP_NOSPACE
+endif
+
 AR = ar
 CC = gcc
 CFLAGS = -Wall -Wextra -Werror -pedantic -g $(DEBUG) $(OPS) $(PROF)
@@ -46,15 +51,15 @@ dirs:
 	@mkdir -p $(ODIR) $(LDIR) || echo "FAILED TO MAKE DIRECTORIES!"
 
 $(ODIR)/%.o: $(SDIR)/%.c dirs
-	$(CC) $(CFLAGS) $(IFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) $(IFLAGS) $(DEFINES) -c $< -o $@
 
 all: $(OBJS)
 	ar rcs $(LDIR)/libhashmap.a $(OBJS)
-	$(CC) $(CFLAGS) $(IFLAGS) -c $(SRC) -shared -o $(LDIR)/libhashmap.so
+	$(CC) $(CFLAGS) $(IFLAGS) $(DEFINES) -c $(SRC) -shared -o $(LDIR)/libhashmap.so
 
 .PHONY: test
 test: $(OBJS)
-	$(CC) $(CFLAGS) $(IFLAGS) $(LIBS) $^ $(TDIR)/$(TESTFILE).c -o $(TDIR)/$(TESTFILE).o
+	$(CC) $(CFLAGS) $(IFLAGS) $(DEFINES) $(LIBS) $^ $(TDIR)/$(TESTFILE).c -o $(TDIR)/$(TESTFILE).o
 	@echo "START TEST: $(TESTFILE)"
 	@$(TDIR)/$(TESTFILE).o && echo "PASSED" || echo "FAILED"
 ifdef prof
@@ -64,12 +69,6 @@ ifeq ($(prof), true)
 	@genhtml main_coverage.info --output-directory out
 endif
 endif
-
-.PHONY: misc_checks
-misc_checks: $(OBJS)
-	$(CC) $(CFLAGS) $(IFLAGS) $(LIBS) $^ $(TDIR)/checks.c -o $(TDIR)/checks.o
-	@echo "START CHECKS"
-	@$(TDIR)/checks.o && echo "DONE" || echo "FAILED"
 
 .PHONY: clean
 clean:
