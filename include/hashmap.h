@@ -14,8 +14,6 @@ extern "C" {
 #include <stddef.h>
 #include <stdint.h>
 
-    // TODO remove hash callback?
-    // TODO make first item of the eq_cb the key?
 
 typedef enum hashcode_e
 {
@@ -28,9 +26,9 @@ typedef enum hashcode_e
 }
 hashcode_t;
 
-typedef uint32_t(*hashmap_hash_cb_t)(const void *el);
-typedef bool(*hashmap_eq_cb_t)(const void *el1, const void *el2);
-typedef hashcode_t(*hashmap_iterate_cb_t)(void *ud, void *el);
+typedef uint32_t(*hashmap_hash_cb_t)(const void *key);
+typedef bool(*hashmap_eq_cb_t)(const void *key1, const void *key2);
+typedef int(*hashmap_iterate_cb_t)(void *ud, const void *key, void *el);
 
 typedef struct hashmap_s hashmap_t;
 #include "hashmap_internal.h"
@@ -39,6 +37,8 @@ typedef struct hashmap_s hashmap_t;
 hashcode_t
 hashmap_init(hashmap_t *map,
              int nslots,
+             int keysize,
+             int elsize,
              hashmap_hash_cb_t hash_cb,
              hashmap_eq_cb_t eq_cb);
 void
@@ -51,13 +51,12 @@ int
 hashmap_capacity(hashmap_t *map);
 bool
 hashmap_is_empty(hashmap_t *map);
-hashcode_t
+void *
 hashmap_get(hashmap_t *map,
-            void *el,
-            void **save);
+            const void *key);
 bool
 hashmap_contains(hashmap_t *map,
-                 void *el);
+                 const void *key);
 hashcode_t
 hashmap_iterate(hashmap_t *map,
                 void *ud,
@@ -68,12 +67,14 @@ void
 hashmap_clear(hashmap_t *map);
 hashcode_t
 hashmap_insert(hashmap_t *map,
-               void *el,
-               void **upsert);
+               const void *key,
+               const void *el,
+               bool upsert);
 hashcode_t
 hashmap_remove(hashmap_t *map,
-               void *el,
-               void **save);
+               const void *key,
+               void *keyout,
+               void *elout);
 
 
 #ifdef __cplusplus
