@@ -9,6 +9,8 @@
 #include <string.h>
 #include <limits.h>
 
+#include <stdio.h>
+
 
 static const uint32_t LEADING_BIT = 0x80000000;
 static const uint32_t MASK = 0x7FFFFFFF;
@@ -508,7 +510,8 @@ hashmap_insert(hashmap_t *map,
         }
         else if (hashmap_internal_slot_debt_lt(map, slot, index, debt))
         {
-            if (PRIMES_LAST == map->pindex) {
+            if (PRIMES_LAST == map->pindex)
+            {
                 // The check is done here because we want to allow upserts
                 // but we don't want to incur the cost of checking up-front.
                 return HASHCODE_NOSPACE;
@@ -587,9 +590,9 @@ hashmap_insert(hashmap_t *map,
 
             if (hashmap_internal_slot_full(slot))
             {
-                char *key = slot + sizeof(uint32_t);
-                char *el = key + map->keysize;
-                code = hashmap_insert(&newmap, key, el, false);
+                char *keytmp = slot + sizeof(uint32_t);
+                char *eltmp = keytmp + map->keysize;
+                code = hashmap_insert(&newmap, keytmp, eltmp, false);
 
                 if (HASHCODE_OK != code)
                 {
@@ -599,7 +602,10 @@ hashmap_insert(hashmap_t *map,
             }
         }
 
-        return HASHCODE_OK;
+        hashmap_destroy(map);
+        memcpy(map, &newmap, sizeof(hashmap_t));
+
+        return hashmap_insert(map, key, el, upsert);
     }
 
     return HASHCODE_NOSPACE;
@@ -631,6 +637,8 @@ hashmap_remove(hashmap_t *map,
         else if (hashmap_internal_slot_hash_eq(slot, hash)
                  && map->eq_cb(slot + sizeof(uint32_t), key))
         {
+            --map->size;
+
             if (keyout)
             {
                 void *keyloc = slot + sizeof(uint32_t);

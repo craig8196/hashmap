@@ -10,44 +10,42 @@
 
 
 static uint32_t
-intptr_hash_cb(const void *el)
+int_hash_cb(const void *key)
 {
-    intptr_t x = (intptr_t)el;
-    return (uint32_t)x;
+    int k = (*((int *)key));
+    return (uint32_t)k;
 }
 
 static bool
-intptr_eq_cb(const void *el1, const void *el2)
+int_eq_cb(const void *key1, const void *key2)
 {
-    return el1 == el2;
+    int k1 = *((int *)key1);
+    int k2 = *((int *)key2);
+    return k1 == k2;
 }
 
 #define MAX_PRIME (11)
-
-#ifndef HASHMAP_BUCKET_COUNT
-#define HASHMAP_BUCKET_COUNT (4)
-#endif
 
 int
 main(void)
 {
     hashmap_t map;
 
-    hashmap_init(&map, 0, intptr_hash_cb, intptr_eq_cb);
+    hashmap_init(&map, 0, sizeof(int), 0, int_hash_cb, int_eq_cb);
 
     int size = 0;
-    intptr_t i;
-    for (i = 0; i < MAX_PRIME * HASHMAP_BUCKET_COUNT; ++i)
+    int i;
+    for (i = 0; i < MAX_PRIME; ++i)
     {
-        assert(HASHCODE_OK == hashmap_insert(&map, (void *)i, NULL) && "Failed insert test");
-        assert(HASHCODE_EXIST == hashmap_insert(&map, (void *)i, NULL) && "Failed double insert test");
+        assert(HASHCODE_OK == hashmap_insert(&map, &i, NULL, false) && "Failed insert test");
+        assert(HASHCODE_EXIST == hashmap_insert(&map, &i, NULL, false) && "Failed double insert test");
         size++;
-        assert(hashmap_contains(&map, (void *)i) && "Failed contains test");
+        assert(hashmap_contains(&map, &i) && "Failed contains test");
         assert(size == hashmap_size(&map) && "Failed size test");
     }
     printf("%s\n", "Passed inserting max number amount");
 
-    assert(HASHCODE_NOSPACE == hashmap_insert(&map, (void *)i, NULL) && "Failed full insert test");
+    assert(HASHCODE_NOSPACE == hashmap_insert(&map, &i, NULL, false) && "Failed full insert test");
     printf("%s\n", "Passed hashmap too full test");
 
     hashmap_destroy(&map);
