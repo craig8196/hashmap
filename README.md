@@ -30,13 +30,13 @@ make all ops=3 # Will set flag -O3
 Run the nospace test:
 
 ```bash
-make test testtarget=nospace nospace=true
+make test target=nospace nospace=true
 ```
 
 Run a test with profiling and a specific target:
 
 ```bash
-make test prof=true testtarget=speed_insert2
+make test prof=true target=speed_insert2
 ```
 
 ## Further Work

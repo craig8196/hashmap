@@ -54,7 +54,7 @@ main(void)
     
     hashmap_t map;
 
-    hashmap_init(&map, 0, hash_cb, eq_cb);
+    hashmap_init(&map, 0, sizeof(hashel_t), 0, hash_cb, eq_cb);
 
     const int max_len = 10000000;
     int len = myrand(1, max_len);
@@ -101,7 +101,7 @@ main(void)
     for (k = 0; k < len; ++k)
     {
         hashel_t *el = &els[k];
-        hashmap_insert(&map, el, NULL);
+        hashmap_insert(&map, el, NULL, false);
     }
 
     if (clock_gettime(CLOCK_REALTIME, &end))

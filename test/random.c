@@ -31,18 +31,17 @@ typedef struct hashel_s
 } hashel_t;
 
 static uint32_t
-hash_cb(const void *el)
+hash_cb(const void *key)
 {
-    hashel_t *e = (hashel_t *)el;
-    return (uint32_t)e->val;
+    return (uint32_t)(*((int *)key));
 }
 
 static bool
-eq_cb(const void *el1, const void *el2)
+eq_cb(const void *key1, const void *key2)
 {
-    hashel_t *e1 = (hashel_t *)el1;
-    hashel_t *e2 = (hashel_t *)el2;
-    return e1->val == e2->val;
+    int k1 = *((int *)key1);
+    int k2 = *((int *)key2);
+    return k1 == k2;
 }
 
 /**
@@ -63,6 +62,7 @@ main(void)
     const int SEED = (int)time(NULL);
     // Previously this seed caused a segfault.
     // const int SEED = 1545011861;
+    // const int SEED = 1552696998;
 
     printf("SEED: %d\n", SEED);
 
@@ -70,11 +70,11 @@ main(void)
     
     hashmap_t map;
 
-    hashmap_init(&map, 0, hash_cb, eq_cb);
+    hashmap_init(&map, 0, sizeof(int), 0, hash_cb, eq_cb);
 
-    int len = myrand(1, 250);
+    int len = myrand(1, 20000);
     hashel_t *els = calloc(len, sizeof(hashel_t));
-    int step = myrand(1, 5);
+    int step = myrand(1, 2000);
     int lowval = myrand(-300, 0);
     int nextval = lowval;
 
@@ -108,30 +108,27 @@ main(void)
                 {
                     if (HASHSTATE_OUT == el->state)
                     {
-                        assert(!hashmap_contains(&map, el) && "Failed contains test");
+                        assert(!hashmap_contains(&map, &el->val) && "Failed contains test");
                     }
                     else
                     {
-                        assert(hashmap_contains(&map, el) && "Failed contains test");
+                        assert(hashmap_contains(&map, &el->val) && "Failed contains test");
                     }
                     assert(size == hashmap_size(&map) && "Failed size test");
                 }
                 break;
                 case HASHACTION_INS:
                 {
-                    void *out = NULL;
                     if (HASHSTATE_OUT == el->state)
                     {
-                        assert(!hashmap_contains(&map, el) && "Failed contains test");
-                        assert(HASHCODE_OK == hashmap_insert(&map, el, &out) && "Failed insert not exist");
-                        assert(NULL == out && "Failed no modify if in");
+                        assert(!hashmap_contains(&map, &el->val) && "Failed contains test");
+                        assert(HASHCODE_OK == hashmap_insert(&map, &el->val, NULL, false) && "Failed insert not exist");
                         ++size;
                     }
                     else
                     {
-                        assert(hashmap_contains(&map, el) && "Failed contains test");
-                        assert(HASHCODE_EXIST == hashmap_insert(&map, el, &out) && "Failed insert exists test");
-                        assert((void *)el == out && "Failed successful upsert");
+                        assert(hashmap_contains(&map, &el->val) && "Failed contains test");
+                        assert(HASHCODE_EXIST == hashmap_insert(&map, &el->val, NULL, false) && "Failed insert exists test");
                     }
                     el->state = HASHSTATE_IN;
                     assert(size == hashmap_size(&map) && "Failed size test");
@@ -140,18 +137,18 @@ main(void)
                 break;
                 case HASHACTION_DEL:
                 {
-                    void *out = NULL;
+                    int out = -1;
                     if (HASHSTATE_OUT == el->state)
                     {
-                        assert(!hashmap_contains(&map, el) && "Failed contains test");
-                        assert(HASHCODE_NOEXIST == hashmap_remove(&map, el, &out) && "Failed remove not exist");
-                        assert(NULL == out && "Failed no modify if not in");
+                        assert(!hashmap_contains(&map, &el->val) && "Failed contains test");
+                        assert(HASHCODE_NOEXIST == hashmap_remove(&map, &el->val, &out, NULL) && "Failed remove not exist");
+                        assert(-1 == out && "Failed no modify if not in");
                     }
                     else
                     {
-                        assert(hashmap_contains(&map, el) && "Failed contains test");
-                        assert(HASHCODE_OK == hashmap_remove(&map, el, &out) && "Failed remove test");
-                        assert((void *)el == out && "Failed successful remove");
+                        assert(hashmap_contains(&map, &el->val) && "Failed contains test");
+                        assert(HASHCODE_OK == hashmap_remove(&map, &el->val, &out, NULL) && "Failed remove test");
+                        assert(el->val == out && "Failed successful remove");
                         --size;
                     }
                     el->state = HASHSTATE_OUT;

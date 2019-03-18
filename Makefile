@@ -24,9 +24,9 @@ endif
 endif
 
 TESTFILE =simple
-ifdef testtarget
-ifneq ($(strip $(testtarget)),)
-	TESTFILE =$(testtarget)
+ifdef target
+ifneq ($(strip $(target)),)
+	TESTFILE =$(target)
 endif
 endif
 

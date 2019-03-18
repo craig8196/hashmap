@@ -177,31 +177,19 @@ hashmap_internal_slot_hash_eq(char *slot, uint32_t hash)
     return (*((uint32_t *)slot) & MASK) == hash;
 }
 
-static inline bool
-hashmap_internal_slot_debt_lt(hashmap_t *map, void *slot, int index, int debt)
+static inline int
+hashmap_internal_hash_debt(const int index,
+                           const int pindex,
+                           const uint32_t hash)
 {
-    uint32_t hash = (*((uint32_t *)slot)) & MASK;
-    int slotdebt = hashmap_internal_prime_modulo(map->pindex, hash) - index;
+    int slotdebt = index - hashmap_internal_prime_modulo(pindex, hash);
 
     if (slotdebt < 0)
     {
-        slotdebt = map->len + slotdebt;
+        slotdebt = PRIMES[pindex] + slotdebt;
     }
 
-    return (slotdebt < debt);
-}
-
-static inline int
-hashmap_internal_hash_debt(hashmap_t *map, int index, uint32_t hash)
-{
-    int debt = hashmap_internal_prime_modulo(map->pindex, hash) - index;
-
-    if (debt < 0)
-    {
-        debt = map->len + debt;
-    }
-
-    return debt;
+    return slotdebt;
 }
 
 static int
@@ -395,10 +383,11 @@ hashmap_get(hashmap_t *map,
             const void *_key)
 {
     // Algorithm:
+    //   Set debt to zero.
     //   Create hash.
-    //   Create index by modulo prime size.
-    //   Track debt as we go.
-    //   Lookup slot.
+    //   Create index by modulo prime size, incrementing as we advance.
+    //   Lookup initial slot, incrementing as we advance.
+    //   Track debt as we go, incrementing each time we advance.
     //   Test slot for fullness, hash, and equal key.
     //   If not found proceed until empty slot or debt is less than ours.
     const char *key = _key;
@@ -421,12 +410,13 @@ hashmap_get(hashmap_t *map,
             // Found it.
             return (slot + sizeof(uint32_t) + map->keysize);
         }
-        else if (hashmap_internal_slot_debt_lt(map, slot, index, debt))
+        else if (hashmap_internal_hash_debt(index, map->pindex, (*(uint32_t *)slot) & MASK) < debt)
         {
             // Entered rich neighborhood, no match.
             return NULL;
         }
 
+        // Increment counters.
         ++debt;
         slot = (index + 1) < map->len ? slot + map->slotsize : map->slots;
         index = (index + 1) < map->len ? (index + 1) : 0;
@@ -478,6 +468,27 @@ hashmap_clear(hashmap_t *map)
     memset(map->slots, 0, len);
 }
 
+void
+hashmap_print(hashmap_t *map)
+{
+    printf("----------------------------------");
+    // Algorithm:
+    //   For each full slot, call the callback with context and element.
+    int index;
+    for (index = 0; index < map->len; ++index)
+    {
+        char *slot = hashmap_internal_get_slot(map, index);
+        printf("\n%d: %s", index, hashmap_internal_slot_full(slot) ? "full" : "empty");
+
+        if (hashmap_internal_slot_full(slot))
+        {
+            char *key = slot + sizeof(uint32_t);
+            printf(" = %d %u", *(int *)key, (*(uint32_t *)slot) & MASK);
+        }
+    }
+    printf("\n----------------------------------\n");
+}
+
 hashcode_t
 hashmap_insert(hashmap_t *map,
                const void *_key,
@@ -508,7 +519,7 @@ hashmap_insert(hashmap_t *map,
             ++map->size;
             return HASHCODE_OK;
         }
-        else if (hashmap_internal_slot_debt_lt(map, slot, index, debt))
+        else if (hashmap_internal_hash_debt(index, map->pindex, (*(uint32_t *)slot) & MASK) < debt)
         {
             if (PRIMES_LAST == map->pindex)
             {
@@ -539,7 +550,7 @@ hashmap_insert(hashmap_t *map,
             el = map->slottmp + map->keysize;
             hash = hashtmp;
 
-            debt = hashmap_internal_hash_debt(map, index, hash);
+            debt = hashmap_internal_hash_debt(index, map->pindex, hash);
             upsert = false;
         }
         else if (hashmap_internal_slot_hash_eq(slot, hash)
@@ -562,6 +573,7 @@ hashmap_insert(hashmap_t *map,
         index = (index + 1) < map->len ? (index + 1) : 0;
     }
 
+    // We apparently need to reallocate, if possible.
     if (map->pindex < PRIMES_LAST)
     {
         // Algorithm:
@@ -608,6 +620,7 @@ hashmap_insert(hashmap_t *map,
         return hashmap_insert(map, key, el, upsert);
     }
 
+    // We're at the end of our rope here.
     return HASHCODE_NOSPACE;
 }
 
@@ -639,49 +652,78 @@ hashmap_remove(hashmap_t *map,
         {
             --map->size;
 
-            if (keyout)
+            if (NULL != keyout)
             {
                 void *keyloc = slot + sizeof(uint32_t);
                 memcpy(keyout, keyloc, map->keysize);
             }
 
-            if (elout)
+            if (NULL != elout)
             {
                 void *elloc = slot + sizeof(uint32_t) + map->keysize;
                 memcpy(elout, elloc, map->elsize);
             }
 
             hashmap_internal_slot_clear(slot);
-
-            void *slotremoved = slot;
-            void *slotsave = slot;
-
             ++debt;
-            while (debt < map->maxrun)
-            {
-                slot = (index + 1) < map->len ? slot + map->slotsize : map->slots;
-                index = (index + 1) < map->len ? (index + 1) : 0;
 
-                if (hashmap_internal_slot_debt_lt(map, slot, index, debt))
+            bool done = false;
+
+            do
+            {
+                void *slotremoved = slot;
+                void *slotsave = slot;
+                int indexsave = index;
+
+                while (debt < map->maxrun)
                 {
-                    // We encountered a new run.
+                    slot = (index + 1) < map->len ? slot + map->slotsize : map->slots;
+                    index = (index + 1) < map->len ? (index + 1) : 0;
+
+                    if (hashmap_internal_slot_empty(slot))
+                    {
+                        done = true;
+                        // Encountered blank space.
+                        break;
+                    }
+                    else if (hashmap_internal_hash_debt(index, map->pindex, (*(uint32_t *)slot) & MASK) < debt)
+                    {
+                        // We encountered a new run.
+                        break;
+                    }
+
+                    ++debt;
+                    slotsave = slot;
+                    indexsave = index;
+                }
+
+                if (debt == map->maxrun)
+                {
+                    slot = (index + 1) < map->len ? slot + map->slotsize : map->slots;
+                    index = (index + 1) < map->len ? (index + 1) : 0;
+                }
+
+                if (slotsave != slotremoved)
+                {
+                    // Copy slot at end of run to removed location.
+                    memcpy(slotremoved, slotsave, map->slotsize);
+                    hashmap_internal_slot_clear(slotsave);
+                }
+
+                if (done)
+                {
                     break;
                 }
 
-                ++debt;
-                slotsave = slot;
+                debt = hashmap_internal_hash_debt(index, map->pindex, (*(uint32_t *)slot) & MASK);
+                slot = slotsave;
+                index = indexsave;
             }
-
-            // Slot should point to the end of our run.
-            if (slotsave != slotremoved)
-            {
-                memcpy(slotremoved, slotsave, map->slotsize);
-                hashmap_internal_slot_clear(slotsave);
-            }
+            while (0 != debt);
 
             return HASHCODE_OK;
         }
-        else if (hashmap_internal_slot_debt_lt(map, slot, index, debt))
+        else if (hashmap_internal_hash_debt(index, map->pindex, (*(uint32_t *)slot) & MASK) < debt)
         {
             return HASHCODE_NOEXIST;
         }
