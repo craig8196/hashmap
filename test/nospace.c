@@ -24,7 +24,7 @@ int_eq_cb(const void *key1, const void *key2)
     return k1 == k2;
 }
 
-#define MAX_PRIME (11)
+const int MAX = 1 << 4;
 
 int
 main(void)
@@ -35,8 +35,9 @@ main(void)
 
     int size = 0;
     int i;
-    for (i = 0; i < MAX_PRIME; ++i)
+    for (i = 0; i < MAX; ++i)
     {
+        printf("Inserting: %d\n", i);
         assert(HASHCODE_OK == hashmap_insert(&map, &i, NULL, false) && "Failed insert test");
         assert(HASHCODE_EXIST == hashmap_insert(&map, &i, NULL, false) && "Failed double insert test");
         size++;
@@ -45,6 +46,7 @@ main(void)
     }
     printf("%s\n", "Passed inserting max number amount");
 
+    printf("Inserting: %d\n", i);
     assert(HASHCODE_NOSPACE == hashmap_insert(&map, &i, NULL, false) && "Failed full insert test");
     printf("%s\n", "Passed hashmap too full test");
 

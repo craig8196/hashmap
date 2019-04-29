@@ -20,6 +20,8 @@ int_eq_cb(const void *key1, const void *key2)
     return k1 == k2;
 }
 
+extern void hashmap_print(hashmap_t *map);
+
 int
 main(void)
 {
@@ -44,6 +46,7 @@ main(void)
     for (i = 0; i < len; ++i)
     {
         out = -1;
+        printf("Checking %d\n", i);
         assert(hashmap_contains(&map, &i) && "Failed contains test");
         assert(HASHCODE_OK == hashmap_remove(&map, &i, &out, NULL) && "Failed remove test");
         assert((i == out) && "Failed store item from remove");

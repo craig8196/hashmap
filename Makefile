@@ -11,8 +11,11 @@ LDIR = ./lib
 
 PROF = 
 ifdef prof
-ifeq ($(prof), true)
+ifeq ($(prof), coverage)
 PROF += -fprofile-arcs -ftest-coverage
+endif
+ifeq ($(prof), gprof)
+PROF += -pg
 endif
 endif
 
@@ -63,10 +66,13 @@ test: $(OBJS)
 	@echo "START TEST: $(TESTFILE)"
 	@$(TDIR)/$(TESTFILE).o && echo "PASSED" || echo "FAILED"
 ifdef prof
-ifeq ($(prof), true)
+ifeq ($(prof), coverage)
 	@gcov -m hashmap.c
 	@lcov --capture --directory obj --output-file main_coverage.info
 	@genhtml main_coverage.info --output-directory out
+endif
+ifeq ($(prof), gprof)
+	gprof $(TDIR)/$(TESTFILE).o gmon.out > analysis.txt
 endif
 endif
 

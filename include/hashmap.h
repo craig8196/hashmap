@@ -41,22 +41,28 @@ hashmap_init(hashmap_t *map,
              int elsize,
              hashmap_hash_cb_t hash_cb,
              hashmap_eq_cb_t eq_cb);
+
 void
 hashmap_destroy(hashmap_t *map);
 
 // Queries
 int
 hashmap_size(hashmap_t *map);
+
 int
 hashmap_capacity(hashmap_t *map);
+
 bool
 hashmap_is_empty(hashmap_t *map);
+
 void *
 hashmap_get(hashmap_t *map,
             const void *key);
+
 bool
 hashmap_contains(hashmap_t *map,
                  const void *key);
+
 hashcode_t
 hashmap_iterate(hashmap_t *map,
                 void *ud,
@@ -65,11 +71,13 @@ hashmap_iterate(hashmap_t *map,
 // Modifiers
 void
 hashmap_clear(hashmap_t *map);
+
 hashcode_t
 hashmap_insert(hashmap_t *map,
                const void *key,
                const void *el,
                bool upsert);
+
 hashcode_t
 hashmap_remove(hashmap_t *map,
                const void *key,

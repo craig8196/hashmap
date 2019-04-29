@@ -13,23 +13,24 @@ struct hashmap_s
 {
     int                 size;
     int                 len;
-    int                 pindex;
-    int                 maxrun;
+    int                 power; // Also max run.
+    int                 shift;
+    int                 mask;
     int                 keysize;
     int                 elsize;
     int                 slotsize;
     hashmap_hash_cb_t   hash_cb;
     hashmap_eq_cb_t     eq_cb;
-    char                *slots;
     char                *slottmp;
     char                *slotswap;
+    char                *slots;
     /*
      * The structure of the table is:
-     * sizeof(uint32_t) hash
+     * sizeof(int)      debt
      * keysize          key
      * elsize           el
      *
-     * The uppermost bit of the hash is used to indicate presence of element.
+     * The uppermost bit of the debt is used to indicate presence of element.
      */
 };
 
