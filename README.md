@@ -35,6 +35,18 @@ int index = (hash * gap) >> ((sizeof(uint32_t)*8) - probe)
 gap can be constant
 probe and shift can be precomputed
 
+## Notes
+1. From initial tests I found that too much time is spent swapping entries due
+   to the robin hood algorithm. I think the algorithm still helps reduce the
+   overall time compared to linear probing alone, however, 
+   chained hash tables give the same guarantees as the robin hood algorithm.
+   From here I would recommend not using an open addressing approach, but
+   find a way to slab allocate and use linked lists of some type.
+1. I'm thinking that only storing an entry pointer and changing to a hashset
+   would give me increased performance. Additionally, this gives power over
+   storage of the entry to the user. Also, I think the hash should be stored
+   with the value to avoid unnecessary rehashing.
+   Then I would need a get_key() function to get the key from the entry.
 
 ## Testing
 The first test, simple.c, was just testing a single insert and remove operation.
