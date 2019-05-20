@@ -1,62 +1,64 @@
 
 # hashmap
-A hashmap implementation in C.
+C hashmap implementation.
 
 ## TODO
-* [ ] Profiling indicates too much swapping, which is hindering performance.
+* [ ] Implement insert, remove, get.
+* [ ] Previous profiling indicates too much swapping, which is hindering performance.
 * [ ] Fix bug with inserting conflict with map->swaptmp on the vanilla version.
 * [ ] Compare with other hashmap implementations.
-* [ ] Allow shrinkage. Develop a heuristic for deallocation. Make an option? Probably &lt;= 25% full is good for reallocation.
+* [ ] Allow shrinkage. Develop a heuristic for deallocation. Make an option? Probably &lt;= 25% or 12.5% full is good for shrinkage.
 
 ## Design Choices
 * Fibonacci Hashing
-* Power of 2 sized table
-* Open addressing
-* Storage of hash
-* Size of elements customizable
-* Max probe of floor(log2(table_size)) before realloc
-* Robin hooding
-
-* Chaining is basically like robin hooding, however, it avoids moving elements.
+* Power of 2 sized tables
+* Use two indexes to map to entry
+* Open addressing with chaining
+* Store 7 bits of hash to prevent checking equivalence, 1 for empty
+* Store 1 bit for head/tail, 1 bit for linear sweep, 6 bits for leap index
+* Incremental rehashing by having array of tables once size gets large
+* Densely packed table
 
 ## Fibonacci Hashing
 Optimization for clamping to a range of power of 2 sized table (without all negative affects of clustering).
 So the trick is to take the range you want to map to: 2**32 for uint32_t
-Divide by the Golden Ratio, which splits up the range.
-Then use probably the upper most bits to use to map into the array.
+Divide by the Golden Ratio, which splits up the range giving you
+a gap to apply between each member.
+
 Example:
-uint32_t hash = n
+```
+uint32_t original_hash = n
 uint32_t gap = floor(2**32 / GR) = 2654435769
 uint32_t gap_prime = 2654435761 OR 2654435789
-gap = gap_prime # primes seem to make things better
-int table_size = 1024
-int probe = 10
-int index = (hash * gap) >> ((sizeof(uint32_t)*8) - probe)
-gap can be constant
-probe and shift can be precomputed
+uint32_t newhash = gap_prime * original_hash
+```
+
+Use newhash for indexing by using bit shift/mask.
 
 ## Notes
 1. From initial tests I found that too much time is spent swapping entries due
-   to the robin hood algorithm. I think the algorithm still helps reduce the
-   overall time compared to linear probing alone, however, 
-   chained hash tables give the same guarantees as the robin hood algorithm.
-   From here I would recommend not using an open addressing approach, but
-   find a way to slab allocate and use linked lists of some type.
-1. I'm thinking that only storing an entry pointer and changing to a hashset
-   would give me increased performance. Additionally, this gives power over
-   storage of the entry to the user. Also, I think the hash should be stored
-   with the value to avoid unnecessary rehashing.
-   Then I would need a get_key() function to get the key from the entry.
+   to the robin hood algorithm.
+   The algorithm still helps keep data co-located, but data starts getting
+   very clustered making data get swapped more and more.
+   If several Robinhood runs are next to eachother, then numerous swaps
+   need to take place upon insertion.
+   Robinhood still is fast upon lookups, but slightly slower than linear
+   collision resolution on insertion.
+   Chaining should be a more effective method to collision resolution.
+1. From other people experimentation and research there is a larger cost
+   with calling the equality callback.
+   Thus, part of the hash is kept for a quick lint check.
+1. When hash tables get large they stop being in cache.
+   Thus, the dual design of switching to multiple tables when the table
+   gets larger.
+   This should keep reallocations smaller/granular and increase the speed of the
+   table by keeping it in cache.
 
 ## Testing
-The first test, simple.c, was just testing a single insert and remove operation.
-The second, linear.c, just tests inserting 1024 integers and removing them.
-The third, nospace.c, reduces the max size of the map so we can test the no
-space return code.
-The fourth, random.c, implements random testing to vet and remove remaining flaws.
-The fifth, large.c, implements random testing using millions of entries.
-The sixth, speed_insert.c, runs a simple performance test for insertions.
+See `test` directory.
 
+
+## Builds
 Run with different optimizations:
 
 ```bash

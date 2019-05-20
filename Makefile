@@ -40,7 +40,7 @@ endif
 
 AR = ar
 CC = gcc
-CFLAGS = -Wall -Wextra -Werror -pedantic -g $(DEBUG) $(OPS) $(PROF)
+CFLAGS = -Wall -Wextra -Werror -pedantic -msse -msse2 -g $(DEBUG) $(OPS) $(PROF)
 IFLAGS = -I$(IDIR)
 
 LIBS =
