@@ -60,14 +60,14 @@ typedef hashcode_t(*hashmap_iterate_cb_t)(void *ud, void *key, void *el);
 typedef struct hashmap_s
 {
     int                 size;
-    int                 keysize;
-    int                 valsize;
-    int                 elsize;
-    int                 slotsize;
     int                 tabtype;
     int                 tablen;
     int                 tabshift;
     void               *tables;
+    int                 keysize;
+    int                 valsize;
+    int                 elsize;
+    int                 slotsize;
     hashmap_hash_cb_t   hash_cb;
     hashmap_eq_cb_t     eq_cb;
 }

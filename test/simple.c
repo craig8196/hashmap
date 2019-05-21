@@ -7,13 +7,28 @@
 
 
 static uint32_t
-int_hash_cb(const void *key)
+hash_cb(const void *key)
 {
     return (uint32_t)(*((int *)key));
 }
 
 static bool
-int_eq_cb(const void *key1, const void *key2)
+eq_cb(const void *key1, const void *key2)
+{
+    int k1 = *((int *)key1);
+    int k2 = *((int *)key2);
+    return k1 == k2;
+}
+
+static uint32_t
+badhash_cb(const void *key)
+{
+    key = key;
+    return 1;
+}
+
+static bool
+badeq_cb(const void *key1, const void *key2)
 {
     int k1 = *((int *)key1);
     int k2 = *((int *)key2);
@@ -23,29 +38,30 @@ int_eq_cb(const void *key1, const void *key2)
 int
 main(void)
 {
-    hashmap_t map;
+    hashmap_t hmap;
+    hashmap_t *map = &hmap;
 
-    hashmap_init(&map, 0, sizeof(int), 0, int_hash_cb, int_eq_cb);
+    // Simple empty tests.
+    hashmap_init(map, sizeof(int), 0, hash_cb, eq_cb);
+    assert(hashmap_empty(map) && "Failed empty");
+    assert(0 == hashmap_size(map) && "Failed zero");
+    hashmap_destroy(map);
 
-    int x = 13;
-    int xout = 0;
+    // Simple insert one test.
+    hashmap_init(map, sizeof(int), 0, hash_cb, eq_cb);
+    int el = 1;
+    int *key = &el;
+    assert(HASHCODE_OK == hashmap_insert(map, key, NULL) && "Failed insert");
+    assert(HASHCODE_EXIST == hashmap_insert(map, key, NULL) && "Failed insert");
+    assert(1 == hashmap_size(map) && "Failed size 1");
+    assert(!hashmap_empty(map) && "Failed empty");
+    assert(NULL != hashmap_get(map, key) && "Failed get");
+    hashmap_print(map);
+    hashmap_destroy(map);
 
-    assert(hashmap_is_empty(&map) && "Failed to be empty");
-    printf("%s\n", "Passed empty");
-    assert(0 == hashmap_insert(&map, &x, NULL, false) && "Failed to insert");
-    printf("%s\n", "Passed insert one");
-    assert(hashmap_contains(&map, &x) && "Failed simple contains one value");
-    printf("%s\n", "Passed contains one");
-    assert(1 == hashmap_size(&map) && "Failed size is one");
-    printf("%s\n", "Passed size one");
-    assert(0 == hashmap_remove(&map, &x, &xout, NULL) && "Failed to remove");
-    printf("%s\n", "Passed remove one");
-    assert(x == xout && "Failed to save value from hashmap");
-    printf("%s\n", "Passed value out one");
-    assert(hashmap_is_empty(&map) && "Failed is empty test");
-    printf("%s\n", "Passed empty of one");
-
-    hashmap_destroy(&map);
+    // Simple insert with bad hash.
+    hashmap_init(map, sizeof(int), 0, badhash_cb, badeq_cb);
+    hashmap_destroy(map);
 
     return 0;
 }
