@@ -8,8 +8,8 @@
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
  * 
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  * 
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -53,10 +53,14 @@ typedef enum hashcode_e
 }
 hashcode_t;
 
+/** @brief Hash callback prototype. */
 typedef uint32_t(*hashmap_hash_cb_t)(const void *key);
+/** @brief Equivalence callback prototype. */
 typedef bool(*hashmap_eq_cb_t)(const void *key1, const void *key2);
-typedef hashcode_t(*hashmap_iterate_cb_t)(void *ud, void *key, void *el);
+/** @brief Iteration callback prototype. */
+typedef hashcode_t(*hashmap_iterate_cb_t)(void *ud, const void *key, void *el);
 
+// Don't access members directly.
 typedef struct hashmap_s
 {
     int                 size;
@@ -83,10 +87,10 @@ hashmap_t;
  */
 hashcode_t
 hashmap_init(hashmap_t *map,
-             int keysize,
-             int valsize,
-             hashmap_hash_cb_t hash_cb,
-             hashmap_eq_cb_t eq_cb);
+             const int keysize,
+             const int valsize,
+             const hashmap_hash_cb_t hash_cb,
+             const hashmap_eq_cb_t eq_cb);
 
 /**
  * @brief Free used resources.
@@ -98,36 +102,44 @@ hashmap_destroy(hashmap_t *map);
  * @return Number of elements in the map.
  */
 int
-hashmap_size(hashmap_t *map);
+hashmap_size(const hashmap_t *map);
 
 /**
  * @return True if empty; false otherwise.
  */
 bool
-hashmap_empty(hashmap_t *map);
+hashmap_empty(const hashmap_t *map);
 
 /**
- * @return Pointer to value in map, if present, valid until next clear/insert/remove.
+ * @return Pointer to value in map, if present, valid until next insert/remove.
  */
 void *
-hashmap_get(hashmap_t *map, const void *key);
+hashmap_get(const hashmap_t *map, const void *key);
+
+/**
+ * @return Pointer to key in map, if present, valid until next insert/remove.
+ */
+void *
+hashmap_getkey(const hashmap_t *map, const void *key);
 
 /**
  * @return True if the map contains the key.
  */
 bool
-hashmap_contains(hashmap_t *map, const void *key);
+hashmap_contains(const hashmap_t *map, const void *key);
 
 /**
  * @brief Iterate over the map.
  * @return HASHCODE_OK on success; other code otherwise.
  */
 hashcode_t
-hashmap_iterate(hashmap_t *map, void *ud, hashmap_iterate_cb_t iter_cb);
+hashmap_iterate(const hashmap_t *map, void *ud,
+                const hashmap_iterate_cb_t iter_cb);
 
 /**
  * @brief Insert the key/val into the hashtable.
- * @return HASHCODE_OK on success; HASHCODE_NOSPACE, HASHCODE_EXIST, HASHCODE_NOMEM otherwise.
+ * @return HASHCODE_OK on success;
+ *         HASHCODE_NOSPACE, HASHCODE_EXIST, HASHCODE_NOMEM otherwise.
  */
 hashcode_t
 hashmap_insert(hashmap_t *map, const void *key, const void *val);
@@ -146,7 +158,7 @@ hashmap_remove(hashmap_t *map, const void *key, void *kout, void *vout);
  * @brief Print useful information about the map for debugging.
  */
 void
-hashmap_print(hashmap_t *map);
+hashmap_print(const hashmap_t *map);
 
 
 #ifdef __cplusplus
