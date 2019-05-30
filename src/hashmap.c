@@ -811,9 +811,8 @@ table_get(hashmap_t const * const map, table_t const * const table,
 
     for (;;)
     {
-        int sindex = index_slot(index);
         int subindex = index_sub(index);
-        slot_t *slot = table_slot(map, table, sindex);
+        slot_t *slot = table_slot(map, table, index_slot(index));
 
         if (first)
         {
@@ -830,7 +829,7 @@ table_get(hashmap_t const * const map, table_t const * const table,
             first = false;
         }
 
-        if (notrust || subhash == slot->hashes[subindex])
+        if (notrust || (subhash == slot->hashes[subindex]))
         {
             // Maybe already exists.
             const void *key2 = slot_key(map, slot, subindex);
