@@ -93,7 +93,7 @@ static const int HASHMAP_MAX_LEN = (INT_MAX/2) + 1;
  */
 static const uint8_t EMPTY = 0xFF;
 static const uint8_t HEAD = 0x80;
-static const uint8_t MASK = 0xC0;
+//static const uint8_t MASK = 0xC0;
 static const uint8_t LEAP = 0x3F;
 static const uint8_t SEARCH = 0x40;
 
@@ -265,7 +265,8 @@ table_shift(int len)
 static inline int
 table_slot_mask(table_t const * const table)
 {
-    return (((table->elmask + 1) / 16) - 1);
+    return table->slotmask;
+//    return (((table->elmask + 1) / 16) - 1);
 }
 
 /**
@@ -309,7 +310,8 @@ table_slot(hashmap_t const * const map, table_t const * const table,
  * @return The maximum load this table may take on.
  */
 static inline int
-table_load(table_t const * const table, const int nslots)
+//table_load(table_t const * const table, const int nslots)
+table_load(const int nslots)
 {
     // TODO make sure we don't go over maximum hashmap size, is this possible?
     // there are some quirks, the load doesn't get checked unless
@@ -365,7 +367,7 @@ table_new(const int index, const int nslots, const int slotsize)
     if (NULL != table)
     {
         table->size = 0;
-        table->load = table_load(table, nslots);
+        table->load = table_load(nslots);
         table->elmask = (nslots * 16) - 1;
         table->slotmask = nslots - 1;
         table->index = index;
@@ -424,7 +426,8 @@ table_iterate_readd_cb(void *ud, const void *key, void *val)
 }
 
 static inline hashcode_t
-table_grow_big(hashmap_t * const map, table_t **table)
+//table_grow_big(hashmap_t * const map, table_t **table)
+table_grow_big()
 {
     // TODO
     // When do we grow the table? If small, or we can't split/increase tables.
@@ -438,7 +441,7 @@ static hashcode_t
 table_grow(hashmap_t * const map, table_t **table)
 {
     static const int HSMALL_MIN = 1 << 15;
-    static const int HSMALL_MAX = 1 << 16;
+    //static const int HSMALL_MAX = 1 << 16;
 
     if (HASHMAP_MAX_LEN == map->size)
     {
@@ -639,7 +642,6 @@ table_emplace(hashmap_t * const map, table_t *table, slot_t *currslot,
         }
 
 
-        uint8_t searchhash = currslot->hashes[index_sub(index)];
         int slotlen = table_slot_len(table);
         int slotmask = table_slot_mask(table);
         for (i = 1, sindex = index_slot(index); i <= slotlen; ++i)
@@ -1142,8 +1144,18 @@ hashmap_remove(hashmap_t * map, const void *key,
 #define LINE "----------------------------------\n"
 #define DELIM "*\n"
 
-void
-table_slots_print(hashmap_t const * const map, table_t const * const table)
+static void
+print_key(char const * const key, const int size)
+{
+    int i;
+    for (i = 0; i < size; ++i)
+    {
+        printf("%02X", key[i] & 0xFF);
+    }
+}
+
+static void
+table_print_slots(hashmap_t const * const map, table_t const * const table)
 {
     int sindex;
     int slen = table_slot_len(table);
@@ -1153,9 +1165,31 @@ table_slots_print(hashmap_t const * const map, table_t const * const table)
         int i;
         for (i = 0; i < SLOTLEN; ++i)
         {
-            printf("H:0x%02X|L:0x%02X\n",
+            printf("H:0x%02X|L:0x%02X",
                 (unsigned int)slot->hashes[i],
                 (unsigned int)slot->leaps[i]);
+            if (EMPTY != slot->hashes[i])
+            {
+                if (HEAD & slot->leaps[i])
+                {
+                    printf(" (head");
+                }
+                else
+                {
+                    printf(" (cons");
+                }
+
+                if (0 == (LEAP & slot->leaps[i]))
+                {
+                    printf(",tail");
+                }
+
+                printf(") 0x");
+
+                char const *key = (char const *)slot_key(map, slot, i);
+                print_key(key, map->keysize);
+            }
+            printf("\n");
         }
 
         if ((sindex + 1) < slen)
@@ -1232,11 +1266,12 @@ hashmap_print(hashmap_t const * const map)
     int i;
     for (i = 0; i < map->tablen; ++i)
     {
+        printf("TABLE\n");
+        printf(LINE);
+
         table_t *table = tables[i];
         if (table->index == i)
         {
-            printf("TABLE\n");
-            printf(LINE);
             printf("Table: %d\n", table->index);
             printf("Size: %d\n", table->size);
             printf("Load: %d\n", table->load);
@@ -1248,11 +1283,12 @@ hashmap_print(hashmap_t const * const map)
             printf(LINE);
             printf("SLOTS\n");
             printf(LINE);
-            table_slots_print(map, table);
+            table_print_slots(map, table);
         }
         else
         {
-            printf("Duplicate of table: %d\n", table->index);
+            printf("Table: %d (duplicate)\n", table->index);
+            printf(LINE);
         }
     }
 

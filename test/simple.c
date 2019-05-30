@@ -41,27 +41,49 @@ main(void)
     hashmap_t hmap;
     hashmap_t *map = &hmap;
 
-    // Simple empty tests.
-    hashmap_init(map, sizeof(int), 0, hash_cb, eq_cb);
-    assert(hashmap_empty(map) && "Failed empty");
-    assert(0 == hashmap_size(map) && "Failed zero");
-    hashmap_destroy(map);
+    {
+        // Simple empty tests.
+        hashmap_init(map, sizeof(int), 0, hash_cb, eq_cb);
+        assert(hashmap_empty(map) && "Failed empty");
+        assert(0 == hashmap_size(map) && "Failed zero");
+        hashmap_destroy(map);
+    }
 
-    // Simple insert one test.
-    hashmap_init(map, sizeof(int), 0, hash_cb, eq_cb);
-    int el = 1;
-    int *key = &el;
-    assert(HASHCODE_OK == hashmap_insert(map, key, NULL) && "Failed insert");
-    assert(HASHCODE_EXIST == hashmap_insert(map, key, NULL) && "Failed insert");
-    assert(1 == hashmap_size(map) && "Failed size 1");
-    assert(!hashmap_empty(map) && "Failed empty");
-    assert(NULL != hashmap_get(map, key) && "Failed get");
-    hashmap_print(map);
-    hashmap_destroy(map);
+    {
+        // Simple insert one test.
+        hashmap_init(map, sizeof(int), 0, hash_cb, eq_cb);
+        int el = 1;
+        int *key = &el;
+        assert(HASHCODE_OK == hashmap_insert(map, key, NULL) && "Failed insert");
+        assert(HASHCODE_EXIST == hashmap_insert(map, key, NULL) && "Failed insert");
+        assert(1 == hashmap_size(map) && "Failed size 1");
+        assert(!hashmap_empty(map) && "Failed empty");
+        assert(NULL != hashmap_get(map, key) && "Failed get");
+        hashmap_destroy(map);
+    }
 
-    // Simple insert with bad hash.
-    hashmap_init(map, sizeof(int), 0, badhash_cb, badeq_cb);
-    hashmap_destroy(map);
+    {
+        // Simple insert with bad hash.
+        hashmap_init(map, sizeof(int), 0, badhash_cb, badeq_cb);
+        int el = 1;
+        int *key = &el;
+        assert(HASHCODE_OK == hashmap_insert(map, key, NULL) && "Failed insert");
+        assert(HASHCODE_EXIST == hashmap_insert(map, key, NULL) && "Failed insert");
+        assert(hashmap_contains(map, key) && "Failed contains");
+        assert(1 == hashmap_size(map) && "Failed size 1");
+        el = 2;
+        assert(HASHCODE_OK == hashmap_insert(map, key, NULL) && "Failed insert");
+        assert(HASHCODE_EXIST == hashmap_insert(map, key, NULL) && "Failed insert");
+        assert(hashmap_contains(map, key) && "Failed contains");
+        assert(2 == hashmap_size(map) && "Failed size 1");
+        el = 3;
+        assert(HASHCODE_OK == hashmap_insert(map, key, NULL) && "Failed insert");
+        assert(HASHCODE_EXIST == hashmap_insert(map, key, NULL) && "Failed insert");
+        assert(hashmap_contains(map, key) && "Failed contains");
+        assert(3 == hashmap_size(map) && "Failed size 1");
+        hashmap_print(map);
+        hashmap_destroy(map);
+    }
 
     return 0;
 }
