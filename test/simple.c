@@ -43,6 +43,7 @@ main(void)
 
     {
         // Simple empty tests.
+        // Test that we can initialize the hashmap.
         hashmap_init(map, sizeof(int), 0, hash_cb, eq_cb);
         assert(hashmap_empty(map) && "Failed empty");
         assert(0 == hashmap_size(map) && "Failed zero");
@@ -51,6 +52,7 @@ main(void)
 
     {
         // Simple insert one test.
+        // Test that we can insert into empty cell.
         hashmap_init(map, sizeof(int), 0, hash_cb, eq_cb);
         int el = 1;
         int *key = &el;
@@ -64,6 +66,7 @@ main(void)
 
     {
         // Simple insert with bad hash.
+        // Test that one item is properly chained onto the next.
         hashmap_init(map, sizeof(int), 0, badhash_cb, badeq_cb);
         int el = 1;
         int *key = &el;
@@ -76,12 +79,37 @@ main(void)
         assert(HASHCODE_EXIST == hashmap_insert(map, key, NULL) && "Failed insert");
         assert(hashmap_contains(map, key) && "Failed contains");
         assert(2 == hashmap_size(map) && "Failed size 1");
-        el = 3;
-        assert(HASHCODE_OK == hashmap_insert(map, key, NULL) && "Failed insert");
-        assert(HASHCODE_EXIST == hashmap_insert(map, key, NULL) && "Failed insert");
-        assert(hashmap_contains(map, key) && "Failed contains");
-        assert(3 == hashmap_size(map) && "Failed size 1");
-        hashmap_print(map);
+        hashmap_destroy(map);
+    }
+
+    {
+        // Simple insert with bad hash with linear problems.
+        // Test that one item is properly chained onto the next even when
+        // the large jump is needed.
+        hashmap_init(map, sizeof(int), 0, hash_cb, eq_cb);
+
+#if 0
+        static const int vals[] =
+        {
+            //1, 2, 3, 5, 8, 13, 
+            //8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 65536
+            1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
+        };
+        static const int len = sizeof(vals)/sizeof(vals[0]);
+#endif
+        int size = 0;
+        int i;
+        for (i = 0; i < 32; ++i)
+        {
+            int el = i;
+            int *key = &el;
+            assert(HASHCODE_OK == hashmap_insert(map, key, NULL) && "Failed insert");
+            assert(HASHCODE_EXIST == hashmap_insert(map, key, NULL) && "Failed insert");
+            assert(hashmap_contains(map, key) && "Failed contains");
+            hashmap_print(map);
+            ++size;
+            assert(size == hashmap_size(map) && "Failed size 1");
+        }
         hashmap_destroy(map);
     }
 
