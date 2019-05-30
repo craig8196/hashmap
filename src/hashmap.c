@@ -168,6 +168,12 @@ index_sub(int index)
     return (index & 0x0F);
 }
 
+static inline int
+index_from(int sindex, int subindex)
+{
+    return ((sindex * SLOTLEN) + subindex);
+}
+
 #if 0
 /**
  * @return Smallest power of 2 within range.
@@ -524,8 +530,8 @@ static inline int
 table_leap(hashmap_t const * const map,
            table_t const * const table,
            slot_t const *slot,
-           const int origindex,
-           const int index,
+           int const origindex,
+           int const index,
            bool * const notrust)
 {
     int subindex = index_sub(index);
@@ -537,18 +543,22 @@ table_leap(hashmap_t const * const map,
     else
     {
         // Linear search through hashes.
-        // Use same hash as previous for search efficiency.
+        // Use same hash as previous for search efficiency,
+        // flag that we can't compare with the hash for
+        // equality test.
         *notrust = true;
         uint8_t searchhash = slot->hashes[subindex];
-        int sindex = index_slot(index) + ((leap & LEAP) * SLOTLEN);
 
         int i;
         int len = table_slot_len(table);
         int slotmask = table_slot_mask(table);
+        // Find the slot to start the search.
+        int sindex = (index_slot(index) + ((int)(leap & LEAP))) & slotmask;
 
+        // Iterate through every slot in the table starting at the leap point.
         for (i = 0; i < len; ++i)
         {
-            slot = table_slot(map, table, (sindex + i) & slotmask);
+            slot = table_slot(map, table, sindex);
             int searchmap = slot_contains(slot, searchhash);
             while (searchmap)
             {
@@ -556,12 +566,15 @@ table_leap(hashmap_t const * const map,
                 const void *key = slot_key(map, slot, currsubindex);
                 uint32_t currhash = hash_fib(map->hash_cb(key));
                 int currindex = table_hash_index(table, currhash);
-                if (origindex == currindex && currindex != index)
+                int finalindex = index_from(sindex, currsubindex);
+                if (origindex == currindex && finalindex != index)
                 {
-                    return (sindex << 4) + currsubindex;
+                    return finalindex;
                 }
                 searchmap = searchmap & (~(1 << currsubindex));
             }
+
+            sindex = (sindex + 1) & slotmask;
         }
 
         // We should never get here.
@@ -674,7 +687,6 @@ table_find_prev_to_index(hashmap_t const * const map,
 {
     int index = origindex;
     bool scrap;
-    printf("here1\n");
     for (;;)
     {
         int nextindex = table_leap(map, table, slot, origindex, index, &scrap);
@@ -684,7 +696,6 @@ table_find_prev_to_index(hashmap_t const * const map,
         }
         index = nextindex;
     }
-    printf("here2\n");
 
     return 0;
 }
@@ -716,14 +727,11 @@ table_re_emplace(hashmap_t * const map,
     }
     else
     {
-        printf("Moving item at our insertion point: %d\n", origindex);
         // Find the entry pointing to our value.
         const void *currkey = slot_key(map, slot, index_sub(origindex));
         uint32_t currhash = hash_fib(map->hash_cb(currkey));
         int headindex = table_hash_index(table, currhash);
-        printf("Headindex: %d\n", headindex);
         int previndex = table_find_prev_to_index(map, table, slot, headindex, origindex);
-        printf("Previndex: %d\n", previndex);
         // Remove entry from linked list.
         uint8_t currleap = slot->leaps[index_sub(origindex)];
         slot_t *prevslot = table_slot(map, table, index_slot(previndex));
@@ -873,9 +881,8 @@ table_insert(hashmap_t * const map, table_t *table,
 
     for (;;)
     {
-        int sindex = index_slot(index);
         int subindex = index_sub(index);
-        slot_t *slot = table_slot(map, table, sindex);
+        slot_t *slot = table_slot(map, table, index_slot(index));
 
         if (first)
         {
@@ -895,7 +902,7 @@ table_insert(hashmap_t * const map, table_t *table,
             first = false;
         }
 
-        if (notrust || subhash == slot->hashes[subindex])
+        if ((subhash == slot->hashes[subindex]) || notrust)
         {
             // Maybe already exists.
             const void *key2 = slot_key(map, slot, subindex);

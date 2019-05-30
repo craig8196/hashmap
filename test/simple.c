@@ -102,11 +102,14 @@ main(void)
         for (i = 0; i < 32; ++i)
         {
             int el = i;
+            printf("Inserting: %d\n", el);
             int *key = &el;
             assert(HASHCODE_OK == hashmap_insert(map, key, NULL) && "Failed insert");
-            assert(HASHCODE_EXIST == hashmap_insert(map, key, NULL) && "Failed insert");
-            assert(hashmap_contains(map, key) && "Failed contains");
             hashmap_print(map);
+            hashcode_t code = hashmap_insert(map, key, NULL);
+            printf("Code: %d\n", (int)code);
+            assert(HASHCODE_EXIST == code && "Failed reinsert");
+            assert(hashmap_contains(map, key) && "Failed contains");
             ++size;
             assert(size == hashmap_size(map) && "Failed size 1");
         }
