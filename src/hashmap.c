@@ -487,7 +487,7 @@ table_grow(hashmap_t * const map, table_t **table)
                     }
                     else
                     {
-                        free(table);
+                        free(*table);
                         *table = (table_t *)map->tables;
                         break;
                     }
@@ -558,7 +558,7 @@ table_leap(hashmap_t const * const map,
                 int currindex = table_hash_index(table, currhash);
                 if (origindex == currindex && currindex != index)
                 {
-                    return sindex + currsubindex;
+                    return (sindex << 4) + currsubindex;
                 }
                 searchmap = searchmap & (~(1 << currsubindex));
             }
@@ -580,7 +580,7 @@ table_find_end(hashmap_t const * const map,
 {
     for (;;)
     {
-        slot_t *slot = table_slot(map, table, index);
+        slot_t *slot = table_slot(map, table, index_slot(index));
         int subindex = index_sub(index);
         if (0 == (slot->leaps[subindex] & LEAP))
         {
@@ -638,7 +638,7 @@ table_emplace(hashmap_t * const map, table_t *table, slot_t *currslot,
                 return table_insert_value(map, table, slot, subindex, subhash, 0, key, val);
             }
 
-            testindex = (index + i) & table_el_mask(table);
+            testindex = (testindex + 1) & table_el_mask(table);
         }
 
 
@@ -674,6 +674,7 @@ table_find_prev_to_index(hashmap_t const * const map,
 {
     int index = origindex;
     bool scrap;
+    printf("here1\n");
     for (;;)
     {
         int nextindex = table_leap(map, table, slot, origindex, index, &scrap);
@@ -683,6 +684,7 @@ table_find_prev_to_index(hashmap_t const * const map,
         }
         index = nextindex;
     }
+    printf("here2\n");
 
     return 0;
 }
@@ -714,11 +716,14 @@ table_re_emplace(hashmap_t * const map,
     }
     else
     {
+        printf("Moving item at our insertion point: %d\n", origindex);
         // Find the entry pointing to our value.
         const void *currkey = slot_key(map, slot, index_sub(origindex));
-        uint32_t currhash = map->hash_cb(currkey);
-        int headindex = table_hash_index(table, hash);
+        uint32_t currhash = hash_fib(map->hash_cb(currkey));
+        int headindex = table_hash_index(table, currhash);
+        printf("Headindex: %d\n", headindex);
         int previndex = table_find_prev_to_index(map, table, slot, headindex, origindex);
+        printf("Previndex: %d\n", previndex);
         // Remove entry from linked list.
         uint8_t currleap = slot->leaps[index_sub(origindex)];
         slot_t *prevslot = table_slot(map, table, index_slot(previndex));
@@ -734,6 +739,8 @@ table_re_emplace(hashmap_t * const map,
                 // TODO undo any changes
                 return code;
             }
+            --map->size;
+            --table->size;
         }
         else
         {
@@ -783,7 +790,7 @@ table_re_emplace(hashmap_t * const map,
             int emplaceindex = table_find_end(map, table, headindex, nextindex);
 
             // Emplace key/val.
-            const void *currval = (const char *)key + map->keysize;
+            const void *currval = (const char *)currkey + map->keysize;
             slot = table_slot(map, table, index_slot(emplaceindex));
             hashcode_t code = 
                 table_emplace(map, table, slot, currhash, hash_sub(currhash),
@@ -792,6 +799,8 @@ table_re_emplace(hashmap_t * const map,
             {
                 return code;
             }
+            --map->size;
+            --table->size;
         }
 
         // Place new key/val
