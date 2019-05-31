@@ -20,11 +20,19 @@
  * SOFTWARE.
  ******************************************************************************/
 
+// TODO THERE IS A MASSIVE ERROR IN MY INSERTION ALGORITHM
+// BASICALLY THERE CAN BE INFINITE LOOPS, BUT I'M NOT SURE
+// HOW IT IS POSSIBLE EXACTLY.
+// I DO KNOW THAT I SHOULD BE ABLE TO ENSURE A LINEAR PROGRESSION
+// OF THE LINKED LISTS WHICH SHOULD FIX THE ISSUE.
+
 #include "hashmap.h"
 
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
+
+#include <emmintrin.h>
 
 #include <inttypes.h>
 #include <stdio.h>
@@ -57,18 +65,6 @@ typedef struct table_s
 table_t;
 
 
-#if 0
-#include <emmintrin.h>
-broadcast word8 value
-__m128i _mm_set1_epi8 (char a)
-compare word8 value
-__mm_cmpeq_epi8(__m128i a, __m128i b)
-take first bit in each register
-int __mm_movemask_epi8(__m128i a)
-get index of first
-_bit_scan_forward()
-#endif
-
 /******************************************************************************
  * BEGIN GLOBAL CONSTANTS
  ******************************************************************************/
@@ -100,7 +96,7 @@ static const uint8_t SEARCH = 0x40;
 /**
  * Max distance before we switch to block searching.
  */
-static const int LEAPMAX = 4;
+static const int LEAPMAX = 17;
 
 /**
  * Number of elements per slot.
@@ -213,6 +209,14 @@ pwr2(int n, const int min, const int max)
 static inline int
 slot_contains(slot_t const * const slot, const uint8_t searchhash)
 {
+#if defined __SSE2__
+    // Documentation:
+    // https://software.intel.com/sites/landingpage/IntrinsicsGuide/
+    __m128i dst = _mm_set1_epi8((char)searchhash);
+    dst = _mm_cmpeq_epi8(*((__m128i *)&(slot->hashes[0])), dst);
+    return _mm_movemask_epi8(dst);
+#else
+    // Slower implementation available if we don't have SSE instructions.
     int result = 0;
 
     int i;
@@ -225,6 +229,7 @@ slot_contains(slot_t const * const slot, const uint8_t searchhash)
     }
 
     return result;
+#endif
 }
 
 /**
@@ -404,12 +409,15 @@ table_iterate(hashmap_t * const map, table_t const * const table,
         int i;
         for (i = 0; i < SLOTLEN; ++i)
         {
-            const void *key = slot_key(map, slot, i);
-            void *val = ((char *)key) + map->keysize;
-            hashcode_t code = cb(ctxt, key, val);
-            if (code)
+            if (EMPTY != slot->hashes[i])
             {
-                return code;
+                const void *key = slot_key(map, slot, i);
+                void *val = ((char *)key) + map->keysize;
+                hashcode_t code = cb(ctxt, key, val);
+                if (code)
+                {
+                    return code;
+                }
             }
         }
     }
@@ -622,6 +630,7 @@ table_emplace(hashmap_t * const map, table_t *table, slot_t *currslot,
         hashcode_t code = table_grow(map, &table);
         if (code)
         {
+            printf("here\n");
             return code;
         }
         else
@@ -878,6 +887,9 @@ table_insert(hashmap_t * const map, table_t *table,
     const uint8_t subhash = hash_sub(hash);
     bool first = true;
     bool notrust = false;
+
+    printf("Inserting: %d\n", *((const int *)key));
+    printf("Orig index: %d\n", origindex);
 
     for (;;)
     {
