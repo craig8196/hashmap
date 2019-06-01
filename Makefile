@@ -29,13 +29,17 @@ endif
 TESTFILE =simple
 ifdef target
 ifneq ($(strip $(target)),)
-	TESTFILE =$(target)
+TESTFILE =$(target)
 endif
 endif
 
 DEFINES =
 ifdef nospace
-	DEFINES = -DTEST_HASHMAP_NOSPACE
+DEFINES += -DTEST_HASHMAP_NOSPACE
+endif
+
+ifdef debug
+DEFINES += -DDEBUG
 endif
 
 AR = ar

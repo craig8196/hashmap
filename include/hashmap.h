@@ -137,6 +137,12 @@ hashmap_iterate(const hashmap_t *map, void *ud,
                 const hashmap_iterate_cb_t iter_cb);
 
 /**
+ * @brief Set all entries and size counts to empty.
+ */
+void
+hashmap_clear(hashmap_t *map);
+
+/**
  * @brief Insert the key/val into the hashtable.
  * @return HASHCODE_OK on success;
  *         HASHCODE_NOSPACE, HASHCODE_EXIST, HASHCODE_NOMEM otherwise.
@@ -155,11 +161,22 @@ hashcode_t
 hashmap_remove(hashmap_t *map, const void *key, void *kout, void *vout);
 
 /**
+ * @brief Check the invariants of the map for debugging.
+ */
+void
+hashmap_invariant(const hashmap_t *map);
+
+/**
  * @brief Print useful information about the map for debugging.
  */
 void
 hashmap_print(const hashmap_t *map);
 
+/**
+ * @brief Print useful stats about the hash table to indicate healthy distribution.
+ */
+void
+hashmap_print_stats(const hashmap_t *map);
 
 #ifdef __cplusplus
 }

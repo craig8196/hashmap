@@ -99,18 +99,19 @@ main(void)
 #endif
         int size = 0;
         int i;
-        for (i = 0; i < 64; ++i)
+        for (i = 0; i < 1024; ++i)
         {
             int el = i;
             int *key = &el;
-            hashmap_print(map);
+
             hashcode_t c = hashmap_insert(map, key, NULL);
-            printf("First code: %d\n", (int)c);
             assert(HASHCODE_OK == c && "Failed insert");
+
             hashcode_t code = hashmap_insert(map, key, NULL);
-            printf("Code: %d\n", (int)code);
             assert(HASHCODE_EXIST == code && "Failed reinsert");
+
             assert(hashmap_contains(map, key) && "Failed contains");
+
             ++size;
             assert(size == hashmap_size(map) && "Failed size 1");
         }
