@@ -90,7 +90,7 @@ main(void)
     struct timespec start;
     struct timespec end;
 
-    hashmap_init(&map, len, sizeof(hashel_t), 0, hash_cb, eq_cb);
+    hashmap_init(&map, sizeof(hashel_t), 0, hash_cb, eq_cb);
 
     if (clock_gettime(CLOCK_REALTIME, &start))
     {
@@ -105,7 +105,7 @@ main(void)
         for (k = 0; k < len; ++k)
         {
             hashel_t *el = &els[k];
-            hashmap_insert(&map, el, NULL, false);
+            hashmap_insert(&map, el, NULL);
         }
         hashmap_clear(&map);
     }

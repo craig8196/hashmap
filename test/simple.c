@@ -82,26 +82,42 @@ main(void)
         hashmap_destroy(map);
     }
 
-    {
-        // Simple insert with bad hash with linear problems.
-        // Test that one item is properly chained onto the next even when
-        // the large jump is needed.
-        hashmap_init(map, sizeof(int), 0, hash_cb, eq_cb);
-
 #if 0
-        static const int vals[] =
-        {
-            //1, 2, 3, 5, 8, 13, 
-            //8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 65536
-            1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
-        };
-        static const int len = sizeof(vals)/sizeof(vals[0]);
-#endif
+    {
+        // Simple linear insert.
+        hashmap_init(map, sizeof(int), 0, hash_cb, eq_cb);
         int size = 0;
         int i;
         for (i = 0; i < 40000; ++i)
         {
             int el = i;
+            int *key = &el;
+
+            hashcode_t c = hashmap_insert(map, key, NULL);
+            assert(HASHCODE_OK == c && "Failed insert");
+
+            hashcode_t code = hashmap_insert(map, key, NULL);
+            assert(HASHCODE_EXIST == code && "Failed reinsert");
+
+            assert(hashmap_contains(map, key) && "Failed contains");
+
+            ++size;
+            assert(size == hashmap_size(map) && "Failed size 1");
+        }
+        // Stats from this look good.
+        //hashmap_print_stats(map);
+        hashmap_destroy(map);
+    }
+#endif
+
+    {
+        // Simple linear multiple of 8 insert.
+        hashmap_init(map, sizeof(int), 0, hash_cb, eq_cb);
+        int size = 0;
+        int i;
+        for (i = 0; i < 40000; ++i)
+        {
+            int el = i * 8;
             int *key = &el;
 
             hashcode_t c = hashmap_insert(map, key, NULL);

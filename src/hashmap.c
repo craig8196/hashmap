@@ -680,20 +680,23 @@ table_emplace(hashmap_t * const map, table_t *table, slot_t *currslot,
 
         int slotlen = table_slot_len(table);
         int slotmask = table_slot_mask(table);
-        for (i = 1, sindex = index_slot(index); i <= slotlen; ++i)
+        sindex = (index_slot(index) + 1) & slotmask;
+        for (i = 1; i < slotlen; ++i)
         {
-            slot = table_slot(map, table, (sindex + i) & slotmask);
+            slot = table_slot(map, table, sindex);
             int searchmap = slot_contains(slot, EMPTY);
             if (searchmap)
             {
                 int currsubindex = __builtin_ffs(searchmap) - 1;
-                int leap = i < LEAPMAX ? i : (LEAPMAX + 1);
+                int leap = i < LEAPMAX ? i : (LEAPMAX - 1);
                 currslot->leaps[index_sub(index)] = 
                     (HEAD & currslot->leaps[index_sub(index)])
                     | (LEAP & leap)
                     | (SEARCH);
                 return table_place(map, table, slot, currsubindex, currslot->hashes[index_sub(index)], 0, key, val);
             }
+
+            sindex = (sindex + 1) & slotmask;
         }
 
         // We should never get here.
@@ -848,7 +851,6 @@ table_re_emplace(hashmap_t * const map,
 #if DEBUG
                 printf("Before1\n");
                 hashmap_invariant(map);
-                hashmap_print(map);
                 printf("Before2\n");
 #endif
 
