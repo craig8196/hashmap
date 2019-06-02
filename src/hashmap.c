@@ -1351,7 +1351,7 @@ hashmap_remove(hashmap_t * map, const void *key,
 
 /** DEBUG FUNCTIONS **/
 
-int
+static int
 head_invariant(hashmap_t const * const map,
                table_t const * const table,
                const int headindex)
@@ -1429,7 +1429,7 @@ head_invariant(hashmap_t const * const map,
     return listlen;
 }
 
-void
+static void
 table_invariant(hashmap_t const * const map, table_t const * const table)
 {
     int i;
@@ -1680,11 +1680,92 @@ hashmap_print(hashmap_t const * const map)
     printf(LINE);
 }
 
+#define STATLEN (32)
+
+/**
+ * @return Any counts not within the alloted space.
+ */
+static int
+head_count(hashmap_t const * const map,
+           table_t const * const table,
+           const int headindex,
+           int *stats)
+{
+    int overflow = 0;
+    int len = table_len(table);
+    int index = headindex;
+
+    int i;
+    for (i = 0; i < len; ++i)
+    {
+        if (i < STATLEN)
+        {
+            ++stats[i];
+        }
+        else
+        {
+            ++overflow;
+        }
+
+        slot_t *slot = table_slot(map, table, index_slot(index));
+        uint8_t leap = slot->leaps[index_sub(index)];
+
+        if (0 == (leap & LEAP))
+        {
+            break;
+        }
+
+        bool scratch;
+        index = table_leap(map, table, slot, headindex, index, &scratch);
+    }
+
+    return overflow;
+}
+
+static int
+table_print_stats(hashmap_t const * const map,
+                  table_t const * const table,
+                  int *totals)
+{
+    int stats[STATLEN] = { 0 };
+    int overflow = 0;
+
+    int i;
+    int len = table_slot_len(table);
+    for (i = 0; i < len; ++i)
+    {
+        slot_t *slot = table_slot(map, table, i);
+
+        int sub;
+        for (sub = 0; sub < SLOTLEN; ++sub)
+        {
+            uint8_t subhash = slot->hashes[sub];
+            uint8_t leap = slot->leaps[sub];
+            if (EMPTY != subhash)
+            {
+                // We have a valid entry.
+                if (leap & HEAD)
+                {
+                    // We have a valid head of a list.
+                    overflow += head_count(map, table, index_from(i, sub), stats);
+                }
+            }
+        }
+    }
+
+    for (i = 0; i < STATLEN; ++i)
+    {
+        totals[i] += stats[i];
+    }
+
+    return overflow;
+}
+
 void
 hashmap_print_stats(hashmap_t const * const map)
 {
-    //int counts[32] = { 0 };
-    //int overflow = 0;
+    int totals[STATLEN] = { 0 };
+    int overflow = 0;
     table_t **tables = NULL;
 
     switch (map->tabtype)
@@ -1710,11 +1791,16 @@ hashmap_print_stats(hashmap_t const * const map)
     {
         table_t *table = tables[i];
         table = table;
-    // TODO
-    // per table and aggregated
-    // count number of direct hits, distance from the start
-    // percentage full/empty
+
+        overflow += table_print_stats(map, table, totals);
     }
+
+    for (i = 0; i < STATLEN; ++i)
+    {
+        printf("%.02d: %d\n", (i + 1), totals[i]);
+    }
+
+    printf("Over %d: %d\n", STATLEN, overflow);
 }
 
 /******************************************************************************

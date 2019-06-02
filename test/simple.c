@@ -115,6 +115,7 @@ main(void)
             ++size;
             assert(size == hashmap_size(map) && "Failed size 1");
         }
+        hashmap_print_stats(map);
         hashmap_destroy(map);
     }
 
