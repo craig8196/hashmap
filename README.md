@@ -3,15 +3,17 @@
 C hashmap implementation.
 
 ## TODO
-* [ ] Implement insert, remove, get.
-* [ ] Previous profiling indicates too much swapping, which is hindering performance.
-* [ ] Fix bug with inserting conflict with map->swaptmp on the vanilla version.
-* [ ] Compare with other hashmap implementations.
-* [ ] Allow shrinkage. Develop a heuristic for deallocation. Make an option? Probably &lt;= 25% or 12.5% full is good for shrinkage.
+* [X] Implement insert, get.
+* [ ] Refactor code.
+* [ ] Implement remove.
+* [ ] Refactor code.
+* [ ] Implement grow table split?
+* [ ] Profile.
+* [ ] Allow shrinkage?
 
 ## Design Choices
-* Fibonacci Hashing
-* Power of 2 sized tables
+* Fibonacci Hashing for speed.
+* Power of 2 sized tables for ease of growth.
 * Use two indexes to map to entry
 * Open addressing with chaining
 * Store 7 bits of hash to prevent checking equivalence, 1 for empty
