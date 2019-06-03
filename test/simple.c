@@ -4,36 +4,8 @@
 #include <string.h>
 
 #include "hashmap.h"
+#include "util.h"
 
-
-static uint32_t
-hash_cb(const void *key)
-{
-    return (uint32_t)(*((int *)key));
-}
-
-static bool
-eq_cb(const void *key1, const void *key2)
-{
-    int k1 = *((int *)key1);
-    int k2 = *((int *)key2);
-    return k1 == k2;
-}
-
-static uint32_t
-badhash_cb(const void *key)
-{
-    key = key;
-    return 1;
-}
-
-static bool
-badeq_cb(const void *key1, const void *key2)
-{
-    int k1 = *((int *)key1);
-    int k2 = *((int *)key2);
-    return k1 == k2;
-}
 
 int
 main(void)
@@ -44,7 +16,7 @@ main(void)
     {
         // Simple empty tests.
         // Test that we can initialize the hashmap.
-        hashmap_init(map, sizeof(int), 0, hash_cb, eq_cb);
+        hashmap_init(map, sizeof(int), 0, int_hash_cb, int_eq_cb);
         assert(hashmap_empty(map) && "Failed empty");
         assert(0 == hashmap_size(map) && "Failed zero");
         hashmap_destroy(map);
@@ -53,7 +25,7 @@ main(void)
     {
         // Simple insert one test.
         // Test that we can insert into empty cell.
-        hashmap_init(map, sizeof(int), 0, hash_cb, eq_cb);
+        hashmap_init(map, sizeof(int), 0, int_hash_cb, int_eq_cb);
         int el = 1;
         int *key = &el;
         assert(HASHCODE_OK == hashmap_insert(map, key, NULL) && "Failed insert");
@@ -67,7 +39,7 @@ main(void)
     {
         // Simple insert with bad hash.
         // Test that one item is properly chained onto the next.
-        hashmap_init(map, sizeof(int), 0, badhash_cb, badeq_cb);
+        hashmap_init(map, sizeof(int), 0, int_badhash_cb, int_eq_cb);
         int el = 1;
         int *key = &el;
         assert(HASHCODE_OK == hashmap_insert(map, key, NULL) && "Failed insert");
@@ -108,7 +80,6 @@ main(void)
         //hashmap_print_stats(map);
         hashmap_destroy(map);
     }
-#endif
 
     {
         // Simple linear multiple of 8 insert.
@@ -131,8 +102,38 @@ main(void)
             ++size;
             assert(size == hashmap_size(map) && "Failed size 1");
         }
+        //hashmap_print_stats(map);
+        hashmap_destroy(map);
+    }
+#endif
+
+    {
+        // Simple random number insertions.
+        const int len = 1024;
+        int *n = rand_intarr_new(len);
+
+        hashmap_init(map, sizeof(int), 0, int_hash_cb, int_eq_cb);
+        int size = 0;
+        int i;
+        for (i = 0; i < len; ++i)
+        {
+            int *key = &n[i];
+
+            hashcode_t c = hashmap_insert(map, key, NULL);
+            assert(HASHCODE_OK == c && "Failed insert");
+
+            hashcode_t code = hashmap_insert(map, key, NULL);
+            assert(HASHCODE_EXIST == code && "Failed reinsert");
+
+            assert(hashmap_contains(map, key) && "Failed contains");
+
+            ++size;
+            assert(size == hashmap_size(map) && "Failed size 1");
+        }
         hashmap_print_stats(map);
         hashmap_destroy(map);
+
+        rand_intarr_free(n);
     }
 
     return 0;

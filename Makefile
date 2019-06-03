@@ -26,16 +26,15 @@ ifneq ($(strip $(ops)),)
 endif
 endif
 
+DEFINES =
 TESTFILE =simple
 ifdef target
 ifneq ($(strip $(target)),)
 TESTFILE =$(target)
 endif
-endif
-
-DEFINES =
-ifdef nospace
+ifeq ($(strip $(target)), nospace)
 DEFINES += -DTEST_HASHMAP_NOSPACE
+endif
 endif
 
 ifdef debug
@@ -51,6 +50,7 @@ LIBS =
 
 SRC = $(wildcard $(SDIR)/*.c)
 OBJS = $(patsubst $(SDIR)/%.c, $(ODIR)/%.o, $(SRC))
+UTILOBJ = $(TDIR)/util.o
 
 
 .PHONY: dirs
@@ -60,12 +60,15 @@ dirs:
 $(ODIR)/%.o: $(SDIR)/%.c dirs
 	$(CC) $(CFLAGS) $(IFLAGS) $(DEFINES) -c $< -o $@
 
+$(TDIR)/%.o: $(TDIR)/%.c
+	$(CC) $(CFLAGS) $(IFLAGS) $(DEFINES) -c $< -o $@
+
 all: $(OBJS)
 	ar rcs $(LDIR)/libhashmap.a $(OBJS)
 	$(CC) $(CFLAGS) $(IFLAGS) $(DEFINES) -c $(SRC) -shared -o $(LDIR)/libhashmap.so
 
 .PHONY: test
-test: $(OBJS)
+test: $(OBJS) $(UTILOBJ)
 	$(CC) $(CFLAGS) $(IFLAGS) $(DEFINES) $(LIBS) $^ $(TDIR)/$(TESTFILE).c -o $(TDIR)/$(TESTFILE).o
 	@echo "START TEST: $(TESTFILE)"
 	@$(TDIR)/$(TESTFILE).o && echo "PASSED" || echo "FAILED"

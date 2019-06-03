@@ -7,39 +7,13 @@
 #include <time.h>
 
 #include "hashmap.h"
+#include "util.h"
 
 
 typedef struct hashel_s
 {
     int val;
 } hashel_t;
-
-static uint32_t
-hash_cb(const void *el)
-{
-    hashel_t *e = (hashel_t *)el;
-    return (uint32_t)e->val;
-}
-
-static bool
-eq_cb(const void *el1, const void *el2)
-{
-    hashel_t *e1 = (hashel_t *)el1;
-    hashel_t *e2 = (hashel_t *)el2;
-    return e1->val == e2->val;
-}
-
-/**
- * @see http://c-faq.com/lib/randrange.html
- * @return Random int value in [low, high].
- */
-static int
-myrand(int low, int high)
-{
-    int r = low + (rand() / ((RAND_MAX / (high - low + 1)) + 1));
-    assert((low <= r && r <= high) && "Invalid random number generated");
-    return r;
-}
 
 int
 main(void)
