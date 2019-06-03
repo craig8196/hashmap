@@ -116,6 +116,9 @@ hash_fib(uint32_t hash)
 static inline uint8_t
 hash_sub(uint32_t hash)
 {
+//    hash ^= (hash >> ((sizeof(hash) * 8)/2));
+//    hash ^= (hash >> ((sizeof(hash) * 8)/4));
+//    return (hash & 0x7F);
     uint8_t *into = (uint8_t *)(&hash);
     return ((into[0] ^ into[1] ^ into[2] ^ into[3]) & 0x7F);
 //    return ((uint8_t)(hash >> 16) & 0x7F);
@@ -160,7 +163,8 @@ index_sub(int index)
 }
 
 static inline int
-index_from(int sindex, int subindex)
+index_from(int sindex,
+           int subindex)
 {
     return ((sindex * SLOTLEN) + subindex);
 }
@@ -202,7 +206,8 @@ pwr2(int n, const int min, const int max)
  * @return Integer value with bits set where there are matching entries.
  */
 static inline int
-slot_contains(slot_t const * const slot, const uint8_t searchhash)
+slot_contains(slot_t const * const slot,
+              const uint8_t searchhash)
 {
 #if defined __SSE2__
     // Documentation:
@@ -231,7 +236,8 @@ slot_contains(slot_t const * const slot, const uint8_t searchhash)
  * @return Pointer to the key in the slot.
  */
 static inline const void *
-slot_key(hashmap_t const * const map, slot_t const * const slot,
+slot_key(hashmap_t const * const map,
+         slot_t const * const slot,
          const int subindex)
 {
     return (const void *)(slot->entries + (map->elsize * subindex));
@@ -243,8 +249,11 @@ slot_key(hashmap_t const * const map, slot_t const * const slot,
 
 // Forward declarations.
 static inline hashcode_t 
-table_insert(hashmap_t * const map, table_t *table,
-             const uint32_t hash, const void *key, const void *val);
+table_insert(hashmap_t * const map,
+             table_t *table,
+             const uint32_t hash,
+             const void *key,
+             const void *val);
 
 /**
  * @return Which table to choose to insert into.
@@ -288,7 +297,8 @@ table_el_mask(table_t const * const table)
  * @return Index into table from hash.
  */
 static inline int
-table_hash_index(table_t const * const table, const uint32_t hash)
+table_hash_index(table_t const * const table,
+                 const uint32_t hash)
 {
     return (hash & table_el_mask(table));
 }
@@ -306,7 +316,8 @@ table_slot_len(table_t const * const table)
  * @return Get the slot at the index.
  */
 static inline slot_t *
-table_slot(hashmap_t const * const map, table_t const * const table,
+table_slot(hashmap_t const * const map,
+           table_t const * const table,
            const int sindex)
 {
     return (slot_t *)(table->slots + (map->slotsize * sindex));
@@ -341,11 +352,14 @@ table_load(const int nslots)
  * @return HASHCODE_OK.
  */
 static inline hashcode_t
-table_place(hashmap_t *const map, table_t * const table,
-                   slot_t * const slot,
-                   const int subindex,
-                   const uint8_t subhash, const uint8_t leap,
-                   const void *key, const void *val)
+table_place(hashmap_t *const map,
+            table_t * const table,
+            slot_t * const slot,
+            const int subindex,
+            const uint8_t subhash,
+            const uint8_t leap,
+            const void *key,
+            const void *val)
 {
     slot->hashes[subindex] = subhash;
     slot->leaps[subindex] = leap;
@@ -374,7 +388,8 @@ table_is_full(table_t const * const table)
  * @brief Clear all entries in the table.
  */
 static inline void
-table_clear(table_t * const table, const int slotsize)
+table_clear(table_t * const table,
+            const int slotsize)
 {
     table->size = 0;
     int i;
@@ -392,7 +407,9 @@ table_clear(table_t * const table, const int slotsize)
  * @param slotsize - Size of one slot.
  */
 static inline table_t *
-table_new(const int index, const int nslots, const int slotsize)
+table_new(const int index,
+          const int nslots,
+          const int slotsize)
 {
     table_t *table = (table_t *)malloc(sizeof(table_t) + (nslots * slotsize));
     
@@ -409,8 +426,10 @@ table_new(const int index, const int nslots, const int slotsize)
 }
 
 static inline hashcode_t
-table_iterate(hashmap_t * const map, table_t const * const table,
-              void *ctxt, hashmap_iterate_cb_t cb)
+table_iterate(hashmap_t * const map,
+              table_t const * const table,
+              void *ctxt,
+              hashmap_iterate_cb_t cb)
 {
     int sindex;
     int slen = table_slot_len(table);
@@ -437,7 +456,9 @@ table_iterate(hashmap_t * const map, table_t const * const table,
 }
 
 static hashcode_t
-table_iterate_readd_cb(void *ud, const void *key, void *val)
+table_iterate_readd_cb(void *ud,
+                       const void *key,
+                       void *val)
 {
     hashmap_t *map = (hashmap_t *)ud;
     return hashmap_insert(map, key, val);
@@ -447,6 +468,8 @@ static inline hashcode_t
 //table_grow_big(hashmap_t * const map, table_t **table)
 table_grow_big()
 {
+    printf("BIG??? NOT YET IMPLEMENTED\n");
+    exit(1);
     // TODO
     // When do we grow the table? If small, or we can't split/increase tables.
     // When do we split tables? If there is space to do so.
@@ -456,7 +479,8 @@ table_grow_big()
 }
 
 static hashcode_t
-table_grow(hashmap_t * const map, table_t **table)
+table_grow(hashmap_t * const map,
+           table_t **table)
 {
     static const int HSMALL_MIN = 1 << 15;
     //static const int HSMALL_MAX = 1 << 16;
@@ -630,9 +654,13 @@ table_find_end(hashmap_t const * const map,
  * @brief Find the next available slot and place the element.
  */
 static hashcode_t
-table_emplace(hashmap_t * const map, table_t *table, slot_t *currslot,
-              const uint32_t hash, const uint8_t subhash,
-              const void *key, const void *val,
+table_emplace(hashmap_t * const map,
+              table_t *table,
+              slot_t *currslot,
+              const uint32_t hash,
+              const uint8_t subhash,
+              const void *key,
+              const void *val,
               int index)
 {
     if (table_is_full(table))
@@ -676,7 +704,7 @@ table_emplace(hashmap_t * const map, table_t *table, slot_t *currslot,
         int slotlen = table_slot_len(table);
         int slotmask = table_slot_mask(table);
         sindex = (index_slot(index) + 1) & slotmask;
-        for (i = 1; i < slotlen; ++i)
+        for (i = 1; i <= slotlen; ++i)
         {
             slot = table_slot(map, table, sindex);
             int searchmap = slot_contains(slot, EMPTY);
@@ -942,8 +970,10 @@ table_re_emplace(hashmap_t * const map,
 }
 
 static inline void *
-table_get(hashmap_t const * const map, table_t const * const table,
-          const uint32_t hash, const void *key)
+table_get(hashmap_t const * const map,
+          table_t const * const table,
+          const uint32_t hash,
+          const void *key)
 {
     int origindex = table_hash_index(table, hash);
     int index = origindex;
@@ -1002,8 +1032,11 @@ table_get(hashmap_t const * const map, table_t const * const table,
 }
 
 static inline hashcode_t 
-table_insert(hashmap_t * const map, table_t *table,
-             const uint32_t hash, const void *key, const void *val)
+table_insert(hashmap_t * const map,
+             table_t *table,
+             const uint32_t hash,
+             const void *key,
+             const void *val)
 {
     int origindex = table_hash_index(table, hash);
     int index = origindex;
@@ -1162,7 +1195,8 @@ hashmap_empty(hashmap_t const * const map)
 }
 
 void *
-hashmap_get(hashmap_t const * const map, const void *key)
+hashmap_get(hashmap_t const * const map,
+            const void *key)
 {
     table_t *table = NULL;
     uint32_t hash = hash_fib(map->hash_cb(key));
@@ -1190,7 +1224,8 @@ hashmap_get(hashmap_t const * const map, const void *key)
 }
 
 void *
-hashmap_getkey(hashmap_t const * const map, const void *key)
+hashmap_getkey(hashmap_t const * const map,
+               const void *key)
 {
     char *val = (char *)hashmap_get(map, key);
 
@@ -1204,13 +1239,15 @@ hashmap_getkey(hashmap_t const * const map, const void *key)
 
 
 bool
-hashmap_contains(hashmap_t const * const map, const void *key)
+hashmap_contains(hashmap_t const * const map,
+                 const void *key)
 {
     return !(NULL == hashmap_get(map, key));
 }
 
 hashcode_t
-hashmap_iterate(hashmap_t const * const map, void *ud,
+hashmap_iterate(hashmap_t const * const map,
+                void *ud,
                 const hashmap_iterate_cb_t iter_cb)
 {
     table_t **tables = NULL;
@@ -1299,7 +1336,9 @@ hashmap_clear(hashmap_t * const map)
 }
 
 hashcode_t
-hashmap_insert(hashmap_t * const map, const void *key, const void *val)
+hashmap_insert(hashmap_t * const map,
+               const void *key,
+               const void *val)
 {
     table_t *table = NULL;
     uint32_t hash = hash_fib(map->hash_cb(key));
@@ -1335,8 +1374,10 @@ hashmap_insert(hashmap_t * const map, const void *key, const void *val)
 }
 
 hashcode_t
-hashmap_remove(hashmap_t * map, const void *key,
-               void * kout, void * vout)
+hashmap_remove(hashmap_t * map,
+               const void *key,
+               void * kout,
+               void * vout)
 // TODO
 //hashmap_remove(hashmap_t * const map, const void *key,
 //               void * const kout, void * const vout)
@@ -1427,7 +1468,8 @@ head_invariant(hashmap_t const * const map,
 }
 
 static void
-table_invariant(hashmap_t const * const map, table_t const * const table)
+table_invariant(hashmap_t const * const map,
+                table_t const * const table)
 {
     int i;
     int len = table_slot_len(table);
@@ -1528,7 +1570,8 @@ hashmap_invariant(hashmap_t const * const map)
 #define LINE "----------------------------------\n"
 
 static void
-print_key(char const * const key, const int size)
+print_key(char const * const key,
+          const int size)
 {
     int i;
     for (i = 0; i < size; ++i)
@@ -1538,7 +1581,8 @@ print_key(char const * const key, const int size)
 }
 
 static void
-table_print_slots(hashmap_t const * const map, table_t const * const table)
+table_print_slots(hashmap_t const * const map,
+                  table_t const * const table)
 {
     int sindex;
     int slen = table_slot_len(table);

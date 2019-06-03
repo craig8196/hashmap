@@ -54,10 +54,9 @@ main(void)
         hashmap_destroy(map);
     }
 
-#if 0
     {
         // Simple linear insert.
-        hashmap_init(map, sizeof(int), 0, hash_cb, eq_cb);
+        hashmap_init(map, sizeof(int), 0, int_hash_cb, int_eq_cb);
         int size = 0;
         int i;
         for (i = 0; i < 40000; ++i)
@@ -77,13 +76,13 @@ main(void)
             assert(size == hashmap_size(map) && "Failed size 1");
         }
         // Stats from this look good.
-        //hashmap_print_stats(map);
+        hashmap_print_stats(map);
         hashmap_destroy(map);
     }
 
     {
         // Simple linear multiple of 8 insert.
-        hashmap_init(map, sizeof(int), 0, hash_cb, eq_cb);
+        hashmap_init(map, sizeof(int), 0, int_hash_cb, int_eq_cb);
         int size = 0;
         int i;
         for (i = 0; i < 40000; ++i)
@@ -102,15 +101,18 @@ main(void)
             ++size;
             assert(size == hashmap_size(map) && "Failed size 1");
         }
-        //hashmap_print_stats(map);
+        hashmap_print_stats(map);
         hashmap_destroy(map);
     }
-#endif
 
     {
         // Simple random number insertions.
-        const int len = 1024;
-        int *n = rand_intarr_new(len);
+        const int len = 10000;
+        int seed = 0;
+        // int forceseed = 1559537524;
+        int forceseed = 0;
+        int *n = rand_intarr_new(len, &seed, forceseed);
+        printf("SEED: %d\n", seed);
 
         hashmap_init(map, sizeof(int), 0, int_hash_cb, int_eq_cb);
         int size = 0;
@@ -120,6 +122,10 @@ main(void)
             int *key = &n[i];
 
             hashcode_t c = hashmap_insert(map, key, NULL);
+            if (c)
+            {
+                printf("Code: %d\n", (int)c);
+            }
             assert(HASHCODE_OK == c && "Failed insert");
 
             hashcode_t code = hashmap_insert(map, key, NULL);

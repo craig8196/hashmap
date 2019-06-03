@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <time.h>
 
 uint32_t
 int_hash_cb(const void *key)
@@ -53,12 +54,22 @@ int_sort(int * arr, const int len)
 }
 
 int *
-rand_intarr_new(const int len)
+rand_intarr_new(const int len, int *seedout, int forceseed)
 {
     int *arr = malloc(sizeof(int) * len);
 
     if (arr)
     {
+        if (forceseed)
+        {
+            (*seedout) = forceseed;
+        }
+        else
+        {
+            (*seedout) = (int)time(NULL);
+        }
+        srand(*seedout);
+
         int i;
         for (i = 0; i < len; ++i)
         {

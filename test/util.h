@@ -21,6 +21,8 @@ bool
 int_eq_cb(const void *key1, const void *key2);
 int
 int_cmp_cb(const void *key1, const void *key2);
+void
+int_sort(int * arr, const int len);
 
 /**
  * @see http://c-faq.com/lib/randrange.html
@@ -33,7 +35,7 @@ rand_int_range(int low, int high);
  * @return New int array of length \len.
  */
 int *
-rand_intarr_new(const int len);
+rand_intarr_new(const int len, int *seedout, int forceseed);
 void
 rand_intarr_free(int *arr);
 
