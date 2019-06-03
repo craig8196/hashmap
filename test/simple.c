@@ -65,6 +65,13 @@ main(void)
             int *key = &el;
 
             hashcode_t c = hashmap_insert(map, key, NULL);
+#if DEBUG
+            if (c)
+            {
+                hashmap_print(map);
+                printf("Code: %d\n", c);
+            }
+#endif
             assert(HASHCODE_OK == c && "Failed insert");
 
             hashcode_t code = hashmap_insert(map, key, NULL);
@@ -85,7 +92,7 @@ main(void)
         hashmap_init(map, sizeof(int), 0, int_hash_cb, int_eq_cb);
         int size = 0;
         int i;
-        for (i = 0; i < 40000; ++i)
+        for (i = 0; i < 70000; ++i)
         {
             int el = i * 8;
             int *key = &el;
@@ -101,6 +108,7 @@ main(void)
             ++size;
             assert(size == hashmap_size(map) && "Failed size 1");
         }
+        // Stats from this look good.
         hashmap_print_stats(map);
         hashmap_destroy(map);
     }
@@ -136,6 +144,7 @@ main(void)
             ++size;
             assert(size == hashmap_size(map) && "Failed size 1");
         }
+        // Stats from this look good.
         hashmap_print_stats(map);
         hashmap_destroy(map);
 
