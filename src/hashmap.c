@@ -287,6 +287,40 @@ slot_key(hashmap_t const * const map,
     return (const void *)(slot->entries + (map->elsize * subindex));
 }
 
+/**
+ * @return Pointer to the val in the slot.
+ */
+static inline const void *
+slot_val(hashmap_t const * const map,
+         slot_t const * const slot,
+         const int subindex)
+{
+    return (const void *)(slot->entries + (map->elsize * subindex) + map->keysize);
+}
+
+/**
+ * @brief Copy out the data.
+ */
+static inline void
+slot_export(hashmap_t const * const map,
+            slot_t const * const slot,
+            void * const kout,
+            void * const vout,
+            int subindex)
+{
+    if (vout)
+    {
+        const void *key = slot_key(map, slot, subindex);
+        memcpy(vout, key, map->keysize);
+    }
+
+    if (kout)
+    {
+        const void *val = slot_val(map, slot, subindex);
+        memcpy(vout, val, map->valsize);
+    }
+}
+
 /******************************************************************************
  * BEGIN TABLE
  ******************************************************************************/
@@ -401,6 +435,24 @@ table_index_dist(table_t const * const table,
     return ((index2 < index1)
             ? (index2 + table_len(table)) - index1
             : index2 - index1);
+}
+
+/**
+ * @brief Copy the entry from one point in the table to another.
+ */
+static inline void
+table_copy_entry(hashmap_t const * const map,
+                 table_t * const table,
+                 int fromindex,
+                 int toindex)
+{
+    int fsub = index_sub(fromindex);
+    int tsub = index_sub(toindex);
+    slot_t *fslot = table_slot(map, table, fsub);
+    slot_t *tslot = table_slot(map, table, tsub);
+    const void *f = slot_key(map, fslot, fsub);
+    void *t = (void *)slot_key(map, tslot, tsub);
+    memcpy(t, f, map->elsize);
 }
 
 /**
@@ -725,6 +777,147 @@ table_find_end(hashmap_t const * const map,
 }
 
 /**
+ * @brief Remove the index from the linked list.
+ * @warn Calling with unindex set to a head is an error.
+ * @warn Does NOT set entry to EMPTY.
+ * @warn Does decrement map and table.
+ */
+static void
+table_unlink(hashmap_t * const map,
+             table_t * const table,
+             const int headindex,
+             const int previndex,
+             const int unindex)
+{
+    // Remove entry from linked list.
+    slot_t *prevslot = table_slot(map, table, index_slot(previndex));
+    slot_t *unslot = table_slot(map, table, index_slot(unindex));
+    uint8_t unleap = unslot->leaps[index_sub(unindex)];
+    uint8_t prevleap = prevslot->leaps[index_sub(previndex)];
+
+    if (0 == (unleap & LEAP))
+    {
+#if DEBUG
+            printf("UNLINK TAIL\n");
+#endif
+        prevslot->leaps[index_sub(previndex)] = HEAD & prevleap;
+    }
+    else
+    {
+#if DEBUG
+            printf("REPLACE LINK\n");
+#endif
+
+        bool badsearch = true;
+        if (!(prevleap & SEARCH) && !(unleap & SEARCH))
+        {
+            int dist = (int)(prevleap & LEAP) + (int)(unleap & LEAP);
+            if (dist < LEAPMAX)
+            {
+#if DEBUG
+                printf("EASY RELINK\n");
+#endif
+                // Good, we don't have to resort to inefficient searching.
+                prevslot->leaps[index_sub(previndex)] =
+                    (prevleap & HEAD) | ((uint8_t)dist);
+                badsearch = false;
+            }
+        }
+
+        bool scrap;
+        int nextindex = table_leap(map, table, unslot, headindex, unindex, &scrap);
+
+        if (badsearch)
+        {
+#if DEBUG
+            printf("HARD RELINK\n");
+#endif
+            int prevsindex = index_slot(previndex);
+            int nextsindex = index_slot(nextindex);
+            int dist =
+                (nextsindex < prevsindex)
+                ? ((nextsindex + table_slot_len(table)) - prevsindex)
+                : (nextsindex - prevsindex);
+#if DEBUG
+            printf("head: %d\n", headindex);
+            printf("prev: %d %d %d\n", previndex, prevsindex, index_sub(previndex));
+            printf("next: %d %d %d\n", nextindex, nextsindex, index_sub(nextindex));
+            printf("dist: %d\n", dist);
+#endif
+
+            uint8_t newleap;
+            if (dist < LEAPMAX)
+            {
+                newleap = SEARCH | ((uint8_t)dist);
+            }
+            else
+            {
+                newleap = SEARCH | (LEAPMAX - 1);
+            }
+
+            // Propagate the subhash.
+            slot_t *nextslot = table_slot(map, table, nextsindex);
+            uint8_t prevsubhash = prevslot->hashes[index_sub(previndex)];
+            if (SEARCH & nextslot->leaps[index_sub(nextindex)])
+            {
+#if DEBUG
+                printf("CASCADE\n");
+#endif
+                int nindex = nextindex;
+                slot_t *nslot = nextslot;
+#if DEBUG
+                printf("NextLeap: %X\n", (int)nextslot->leaps[index_sub(nextindex)]);
+#endif
+                for (;;)
+                {
+                    bool scratch;
+                    int nnindex = table_leap(map, table, nslot, headindex, nindex, &scratch);
+
+                    // We can change the next's subhash.
+                    nslot->hashes[index_sub(nindex)] = prevsubhash;
+                    // Advance the slot pointer.
+                    nslot = table_slot(map, table, index_slot(nnindex));
+                    // Get the next mask.
+                    uint8_t nnleap = nslot->leaps[index_sub(nnindex)];
+#if DEBUG
+                    printf("NNIndex: %d\n", nnindex);
+                    printf("NNextLeap: %X\n", (int)nnleap);
+#endif
+                    nindex = nnindex;
+                    if (0 == (LEAP & nnleap))
+                    {
+                        // If the next entry is the end, we're done.
+                        break;
+                    }
+                    if (!(SEARCH & nnleap))
+                    {
+                        // If the next entry isn't a search, we're done.
+                        break;
+                    }
+                }
+
+                // Change the next subhash
+                nslot->hashes[index_sub(nindex)] = prevsubhash;
+            }
+            else
+            {
+#if DEBUG
+                    printf("SINGLE CASCADE\n");
+#endif
+                    // Correct the next index's subhash.
+                    nextslot->hashes[index_sub(nextindex)] = prevsubhash;
+            }
+
+            // Good, we can just replace the previous leap.
+            prevslot->leaps[index_sub(previndex)] =
+                (prevleap & HEAD) | newleap;
+        }
+    }
+    --map->size;
+    --table->size;
+}
+
+/**
  * @brief Find the next available slot and place the element.
  */
 static hashcode_t
@@ -896,160 +1089,21 @@ table_re_emplace(hashmap_t * const map,
         uint32_t currhash = hash_fib(map->hash_cb(currkey));
         int headindex = table_hash_index(table, currhash);
         int previndex = table_find_prev_to_index(map, table, slot, headindex, origindex);
-#if DEBUG
-        printf("HeadIndex: %d\n", headindex);
-        printf("PrevIndex: %d\n", previndex);
-#endif
-        // Remove entry from linked list.
-        uint8_t currleap = slot->leaps[index_sub(origindex)];
-        slot_t *prevslot = table_slot(map, table, index_slot(previndex));
-        if (0 == (currleap & LEAP))
+        // Unlink.
+        table_unlink(map, table, headindex, previndex, origindex);
+        // Find end of list.
+        int emplaceindex = table_find_end(map, table, headindex, previndex);
+
+        // Emplace key/val.
+        const void *currval = (const char *)currkey + map->keysize;
+        slot_t *emplaceslot = table_slot(map, table, index_slot(emplaceindex));
+        hashcode_t code = table_emplace(map, table, emplaceslot,
+                                        currhash, currkey, currval,
+                                        headindex, emplaceindex);
+
+        if (code)
         {
-#if DEBUG
-            printf("REPLACE TAIL\n");
-#endif
-            // Emplace key/val since we're relocating the tail.
-            const void *currval = (const char *)currkey + map->keysize;
-            hashcode_t code = table_emplace(map, table, prevslot, currhash, currkey, currval, headindex, previndex);
-            if (code)
-            {
-                // No changes made yet.
-                return code;
-            }
-            --map->size;
-            --table->size;
-        }
-        else
-        {
-            uint8_t prevleap = prevslot->leaps[index_sub(previndex)];
-#if DEBUG
-            printf("REPLACE LINK\n");
-#endif
-
-            bool badsearch = true;
-            if (!(prevleap & SEARCH) && !(currleap & SEARCH))
-            {
-                int dist = (int)(prevleap & LEAP) + (int)(currleap & LEAP);
-                if (dist < LEAPMAX)
-                {
-#if DEBUG
-                    printf("EASY RELINK\n");
-#endif
-                    // Good, we don't have to resort to inefficient searching.
-                    prevslot->leaps[index_sub(previndex)] =
-                        (prevslot->leaps[index_sub(previndex)] & HEAD)
-                        | ((uint8_t)dist);
-                    badsearch = false;
-                }
-            }
-
-            bool scrap;
-            int nextindex = table_leap(map, table, slot, headindex, origindex, &scrap);
-
-            if (badsearch)
-            {
-#if DEBUG
-                printf("HARD RELINK\n");
-#endif
-                int prevsindex = index_slot(previndex);
-                int nextsindex = index_slot(nextindex);
-                int dist = nextsindex < prevsindex ?
-                    ((nextsindex + table_slot_len(table)) - prevsindex)
-                    : (nextsindex - prevsindex);
-
-#if DEBUG
-                printf("head: %d\n", headindex);
-                printf("prev: %d %d %d\n", previndex, prevsindex, index_sub(previndex));
-                printf("next: %d %d %d\n", nextindex, nextsindex, index_sub(nextindex));
-                printf("dist: %d\n", dist);
-#endif
-
-                uint8_t newleap;
-                if (dist < LEAPMAX)
-                {
-                    newleap = SEARCH | ((uint8_t)dist);
-                }
-                else
-                {
-                    newleap = SEARCH | (LEAPMAX - 1);
-                }
-
-                // Propagate the subhash.
-                slot_t *nextslot = table_slot(map, table, nextsindex);
-                if (SEARCH & nextslot->leaps[index_sub(nextindex)])
-                {
-#if DEBUG
-                    printf("CASCADE\n");
-#endif
-                    int nindex = nextindex;
-                    int pindex = previndex;
-                    slot_t *nslot = nextslot;
-                    slot_t *pslot = prevslot;
-
-#if DEBUG
-                    printf("NextLeap: %X\n", (int)nextslot->leaps[index_sub(nextindex)]);
-#endif
-
-                    for (;;)
-                    {
-                        bool scratch;
-                        int nnindex = table_leap(map, table, nslot, headindex, nindex, &scratch);
-
-                        // We can change the next's subhash.
-                        nslot->hashes[index_sub(nindex)] = pslot->hashes[index_sub(pindex)];
-
-                        nslot = table_slot(map, table, index_slot(nnindex));
-
-                        uint8_t nnleap = nslot->leaps[index_sub(nnindex)];
-#if DEBUG
-                        printf("NNIndex: %d\n", nnindex);
-                        printf("NNextLeap: %X\n", (int)nnleap);
-#endif
-                        nindex = nnindex;
-                        if (0 == (LEAP & nnleap))
-                        {
-                            break;
-                        }
-                        if (!(SEARCH & nnleap))
-                        {
-                            break;
-                        }
-                    }
-                    nslot->hashes[index_sub(nindex)] = pslot->hashes[index_sub(pindex)];
-                }
-                else
-                {
-#if DEBUG
-                    printf("SINGLE CASCADE\n");
-#endif
-                    // Correct the next index's subhash.
-                    nextslot->hashes[index_sub(nextindex)] =
-                        prevslot->hashes[index_sub(previndex)];
-                }
-
-                // Good, we can 
-                prevslot->leaps[index_sub(previndex)] =
-                    (prevslot->leaps[index_sub(previndex)] & HEAD)
-                    | newleap;
-            }
-
-            // Find end of list.
-            int emplaceindex = table_find_end(map, table, headindex, nextindex);
-
-            // Emplace key/val.
-            const void *currval = (const char *)currkey + map->keysize;
-            slot_t *emplaceslot = table_slot(map, table, index_slot(emplaceindex));
-            hashcode_t code = 
-                table_emplace(map, table, emplaceslot,
-                              currhash, currkey, currval,
-                              headindex, emplaceindex);
-
-            if (code)
-            {
-                return code;
-            }
-            --map->size;
-            --table->size;
+            return code;
         }
 
         // Place new key/val
@@ -1071,11 +1125,9 @@ table_get(hashmap_t const * const map,
 
     do
     {
-        int origindex = table_hash_index(table, hash);
-        int index = origindex;
-        const uint8_t subhash = hash_sub(hash);
-        int subindex = index_sub(index);
-        slot_t *slot = table_slot(map, table, index_slot(index));
+        int headindex = table_hash_index(table, hash);
+        int subindex = index_sub(headindex);
+        slot_t *slot = table_slot(map, table, index_slot(headindex));
 
         if (EMPTY == slot->hashes[subindex])
         {
@@ -1087,6 +1139,8 @@ table_get(hashmap_t const * const map,
             break;
         }
 
+        const uint8_t subhash = hash_sub(hash);
+        int index = headindex;
         bool notrust = false;
         for (;;)
         {
@@ -1107,7 +1161,7 @@ table_get(hashmap_t const * const map,
             }
 
             notrust = false;
-            index = table_leap(map, table, slot, origindex, index, &notrust);
+            index = table_leap(map, table, slot, headindex, index, &notrust);
             subindex = index_sub(index);
             slot = table_slot(map, table, index_slot(index));
         }
@@ -1206,6 +1260,103 @@ table_insert(hashmap_t * const map,
 #endif
 
     // Realistically we should never get here.
+    return code;
+}
+
+static inline hashcode_t
+table_remove(hashmap_t * const map,
+             table_t * const table,
+             const uint32_t hash,
+             void const * const key,
+             void * kout,
+             void * vout)
+{
+    hashcode_t code = HASHCODE_NOEXIST;
+
+    do
+    {
+        int headindex = table_hash_index(table, hash);
+        int subindex = index_sub(headindex);
+        slot_t *slot = table_slot(map, table, index_slot(headindex));
+
+        if (EMPTY == slot->hashes[subindex])
+        {
+            break;
+        }
+
+        if (!(slot->leaps[subindex] & HEAD))
+        {
+            break;
+        }
+
+        const uint8_t subhash = hash_sub(hash);
+        int previndex = headindex;
+        int index = headindex;
+        bool notrust = false;
+        for (;;)
+        {
+            if ((subhash == slot->hashes[subindex]) || notrust)
+            {
+                // Maybe exists.
+                const void *key2 = slot_key(map, slot, subindex);
+                if (map->eq_cb(key, key2))
+                {
+                    if (HEAD & slot->leaps[subindex])
+                    {
+                        if (0 != (slot->leaps[subindex] & LEAP))
+                        {
+                            // Unlink and copy the next item.
+                            previndex = index;
+                            index = table_leap(map, table, slot, headindex, index, &notrust);
+                            table_unlink(map, table, headindex, previndex, index);
+                            slot_export(map, slot, kout, vout, subindex);
+                            table_copy_entry(map, table, index, headindex);
+                            slot = table_slot(map, table, index_slot(index));
+                            subindex = index_sub(index);
+                            if (notrust)
+                            {
+                                // Update the hash.
+                                slot->hashes[subindex] =
+                                    hash_fib(map->hash_cb(slot_key(map, slot, subindex)));
+                            }
+                            // Transfer the hash.
+                            slot_t *headslot = table_slot(map, table, index_slot(headindex));
+                            headslot->hashes[index_sub(headindex)] = slot->hashes[subindex];
+                            kout = NULL;
+                            vout = NULL;
+                        }
+                        else
+                        {
+                            // Only entry, it will get cleared below.
+                        }
+                    }
+                    else
+                    {
+                        table_unlink(map, table, headindex, previndex, index);
+                    }
+
+                    slot->hashes[subindex] = EMPTY;
+                    slot_export(map, slot, kout, vout, subindex);
+
+                    code = HASHCODE_OK;
+                    break;
+                }
+            }
+
+            if (0 == (slot->leaps[subindex] & LEAP))
+            {
+                break;
+            }
+
+            notrust = false;
+            previndex = index;
+            index = table_leap(map, table, slot, headindex, index, &notrust);
+            subindex = index_sub(index);
+            slot = table_slot(map, table, index_slot(index));
+        }
+    }
+    while (false);
+
     return code;
 }
 
@@ -1466,17 +1617,34 @@ hashmap_insert(hashmap_t * const map,
 }
 
 hashcode_t
-hashmap_remove(hashmap_t * map,
-               const void *key,
-               void * kout,
-               void * vout)
-// TODO
-//hashmap_remove(hashmap_t * const map, const void *key,
-//               void * const kout, void * const vout)
+hashmap_remove(hashmap_t * const map,
+               void const * const key,
+               void *kout,
+               void *vout)
 {
-    // TODO
-    map = map; key = key; kout = kout; vout = vout;
-    return HASHCODE_ERROR;
+    table_t *table = NULL;
+    uint32_t hash = hash_fib(map->hash_cb(key));
+
+    switch (map->tabtype)
+    {
+        case HBIG:
+            {
+                table = ((table_t **)map->tables)[table_choose(map, hash)];
+            }
+            break;
+        case HSMALL:
+            {
+                table = (table_t *)map->tables;
+            }
+            break;
+        case HEMPTY:
+            {
+                return HASHCODE_NOEXIST;
+            }
+            break;
+    }
+
+    return table_remove(map, table, hash, key, kout, vout);
 }
 
 /** DEBUG FUNCTIONS **/
