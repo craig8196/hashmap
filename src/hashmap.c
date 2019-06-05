@@ -136,15 +136,6 @@ pop_count(uint32_t n)
 }
 
 /**
- * @return The exponent needed to give you n.
- */
-static inline int
-log2_of_pwr2(int n)
-{
-    return pop_count(n - 1);
-}
-
-/**
  * @return Slot index from index.
  */
 static inline int
@@ -308,13 +299,13 @@ slot_export(hashmap_t const * const map,
             void * const vout,
             int subindex)
 {
-    if (vout)
+    if (kout)
     {
         const void *key = slot_key(map, slot, subindex);
-        memcpy(vout, key, map->keysize);
+        memcpy(kout, key, map->keysize);
     }
 
-    if (kout)
+    if (vout)
     {
         const void *val = slot_val(map, slot, subindex);
         memcpy(vout, val, map->valsize);
@@ -2072,8 +2063,6 @@ table_print_stats(hashmap_t const * const map,
 void
 hashmap_print_stats(hashmap_t const * const map)
 {
-    int totals[STATLEN] = { 0 };
-    int overflow = 0;
     table_t **tables = NULL;
 
     switch (map->tabtype)
@@ -2096,13 +2085,14 @@ hashmap_print_stats(hashmap_t const * const map)
 
     if (map->size)
     {
+        int totals[STATLEN] = { 0 };
+        int overflow = 0;
+
         double dsize = (double)map->size;
         int i;
         for (i = 0; i < map->tablen; ++i)
         {
             table_t *table = tables[i];
-            table = table;
-
             overflow += table_print_stats(map, table, totals);
         }
 

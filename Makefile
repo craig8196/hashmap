@@ -53,6 +53,10 @@ OBJS = $(patsubst $(SDIR)/%.c, $(ODIR)/%.o, $(SRC))
 UTILOBJ = $(TDIR)/util.o
 
 
+all: $(OBJS)
+	ar rcs $(LDIR)/libhashmap.a $(OBJS)
+	$(CC) $(CFLAGS) $(IFLAGS) $(DEFINES) -c $(SRC) -shared -o $(LDIR)/libhashmap.so
+
 .PHONY: dirs
 dirs:
 	@mkdir -p $(ODIR) $(LDIR) || echo "FAILED TO MAKE DIRECTORIES!"
@@ -63,9 +67,14 @@ $(ODIR)/%.o: $(SDIR)/%.c dirs
 $(TDIR)/%.o: $(TDIR)/%.c
 	$(CC) $(CFLAGS) $(IFLAGS) $(DEFINES) -c $< -o $@
 
-all: $(OBJS)
-	ar rcs $(LDIR)/libhashmap.a $(OBJS)
-	$(CC) $(CFLAGS) $(IFLAGS) $(DEFINES) -c $(SRC) -shared -o $(LDIR)/libhashmap.so
+.PHONY: check
+check:
+	@echo "START CPPCHECK"
+	cppcheck --enable=warning,style,performance,portability,information -I $(IDIR) $(SRC)
+	@echo "END CPPCHECK"
+	@echo "START CLANG/SCAN-BUILD"
+	scan-build make
+	@echo "END CLANG/SCAN-BUILD"
 
 .PHONY: test
 test: $(OBJS) $(UTILOBJ)
