@@ -13,6 +13,11 @@ C hashmap implementation.
 * [ ] Implement grow table split?
 * [ ] Profile.
 
+## Inspiration
+From descriptions of Google's hashmap and Malte Skarupke's bytell hashmap
+found here:
+https://www.youtube.com/watch?v=M2fKMP47slQ
+
 ## Design Choices
 * Fibonacci Hashing for speed.
 * Power of 2 sized tables for ease of growth and modulo.

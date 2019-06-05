@@ -41,6 +41,10 @@ ifdef debug
 DEFINES += -DDEBUG
 endif
 
+ifdef invariant
+DEFINES += -DINVARIANT
+endif
+
 AR = ar
 CC = gcc
 CFLAGS = -Wall -Wextra -Werror -pedantic -msse2 -g $(DEBUG) $(OPS) $(PROF)

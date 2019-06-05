@@ -16,9 +16,10 @@ main(void)
     const int max_iter = 1024 * 100;
     const int max_len = 1024;
 
+    int nlen = max_len + max_iter;
     int seed = 0;
     int forceseed = 0;
-    int *n = rand_intarr_new(max_len, &seed, forceseed);
+    int *n = rand_intarr_new(nlen, &seed, forceseed);
 
     printf("SEED: %d\n", seed);
 
@@ -36,13 +37,15 @@ main(void)
         return errno;
     }
 
+    int *nums = n;
     int j;
     for (j = 0; j < max_iter; ++j)
     {
+        nums = &n[j];
         int k;
         for (k = 0; k < max_len; ++k)
         {
-            hashmap_insert(&map, &n[k], NULL);
+            hashmap_insert(&map, &nums[k], NULL);
         }
         hashmap_clear(&map);
     }

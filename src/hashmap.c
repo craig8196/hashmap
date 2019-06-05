@@ -153,12 +153,36 @@ index_sub(int index)
     return (index & 0x0F);
 }
 
+/**
+ * @return Combined index.
+ */
 static inline int
 index_from(int sindex,
            int subindex)
 {
     return ((sindex * SLOTLEN) + subindex);
 }
+
+/**
+ * @return Distance from tail index.
+ */
+static inline int
+index_loc(const int h,
+          const int t,
+          const int e,
+          const int len,
+          const int mask)
+{
+    // I think this works.
+    // Len is power of two and mask is the mask for modulo.
+    // I'm not sure this works under subtraction...
+    // (A + B) mod M = ((A mod M) + (B mod M)) mod M
+    // Find tail delta from head: (tail + length) - head modulo len
+    // Find empty delta from head: (empty + length) - head modulo len
+    // Return difference of empty and tail deltas.
+    return (((e + len) - h) & mask) - (((t + len) - h) & mask);
+}
+
 
 #if 0
 /**
@@ -239,11 +263,10 @@ slot_contains_after(slot_t const * const slot,
  * @return Integer value with bits set where there are matches before subindex.
  */
 static inline int
-slot_contains_before(slot_t const * const slot,
-                     const uint8_t searchhash,
-                     int subindex)
+searchmap_limit_before(int searchmap,
+                       int subindex)
 {
-    return (slot_contains(slot, searchhash) & ((1 << subindex) - 1));
+    return (searchmap & ((1 << subindex) - 1));
 }
 
 /**
@@ -909,6 +932,53 @@ table_unlink(hashmap_t * const map,
 }
 
 /**
+ * @brief Find empty.
+ */
+static inline int
+table_find_empty(hashmap_t const * const map,
+                 table_t const * const table,
+                 slot_t const * slot, // Starts out pointing to afterindex.
+                 const int afterindex)
+{
+    int emptyindex = -1;
+
+    int i;
+    int len = table_slot_len(table);
+    int sindex = index_slot(afterindex);
+    int subindex = index_sub(afterindex);
+    int searchmap = slot_contains_after(slot, EMPTY, subindex);
+    int slotmask = table_slot_mask(table);
+
+    for (i = 0; i < len; ++i)
+    {
+        if (searchmap)
+        {
+            subindex = searchmap_next(searchmap);
+            emptyindex = index_from(sindex, subindex);
+            break;
+        }
+
+        sindex = (sindex + 1) & slotmask;
+        slot = table_slot(map, table, sindex);
+        searchmap = slot_contains(slot, EMPTY);
+    }
+
+    if (i == len)
+    {
+        // Note that the slot and sindex are already back where we started
+        // by this point.
+        searchmap = searchmap_limit_before(searchmap, subindex);
+        if (searchmap)
+        {
+            subindex = searchmap_next(searchmap);
+            emptyindex = index_from(sindex, subindex);
+        }
+    }
+
+    return emptyindex;
+}
+
+/**
  * @brief Find the next available slot and place the element.
  */
 static hashcode_t
@@ -940,60 +1010,29 @@ table_emplace(hashmap_t * const map,
         printf("EMPLACE HEAD: %d\n", headindex);
         printf("EMPLACE TAIL: %d\n", tailindex);
 #endif
-        int sindex = index_slot(tailindex);
-        int subindex = index_sub(tailindex);
-        slot_t *slot = table_slot(map, table, sindex);
-        // Test entries in same slot after tailindex.
-        int searchmap = slot_contains_after(slot, EMPTY, subindex);
-        int emptyindex = -1;
-        if (searchmap)
-        {
-#if DEBUG
-            printf("EMPLACE OPTIMAL\n");
-#endif
-            // Optimal case with close empty slot.
-            subindex = searchmap_next(searchmap);
-            emptyindex = index_from(sindex, subindex);
-        }
-        else
-        {
-#if DEBUG
-            printf("EMPLACE SEARCH\n");
-#endif
-            // Continue search after slot.
-            int i;
-            // TODO remove plus one here when doing extended algorithm
-            int len = 1 + table_slot_count(table, tailindex, headindex);
-#if DEBUG
-            printf("EMPLACE SEARCH SLOT LEN: %d\n", len);
-#endif
-            int slotmask = table_slot_mask(table);
-            sindex = (sindex + 1) & slotmask;
-            for (i = 0; i < len; ++i)
-            {
-                slot = table_slot(map, table, sindex);
-                searchmap = slot_contains(slot, EMPTY);
-#if DEBUG
-            printf("SLOT SEARCH: %d %d\n", sindex, searchmap);
-#endif
-                if (searchmap)
-                {
-                    subindex = searchmap_next(searchmap);
-                    emptyindex = index_from(sindex, subindex);
-                    break;
-                }
-                sindex = (sindex + 1) & slotmask;
-            }
-        }
+        slot_t *slot = table_slot(map, table, index_slot(tailindex));
+        int emptyindex = table_find_empty(map, table, slot, tailindex);
+        // Update slot pointer to point to empty for placement.
+        slot = table_slot(map, table, index_slot(emptyindex));
+        int aftertail = index_loc(headindex, tailindex, emptyindex, table_len(table), table_el_mask(table));
 
-        if (emptyindex != -1)
+#if DEBUG
+        printf("EMPLACE EMPTY: %d\n", emptyindex);
+        printf("LEN: %X\n", table_len(table));
+        printf("MASK: %X\n", table_el_mask(table));
+        printf("AFTER TAIL: %d\n", aftertail);
+#endif
+
+
+        uint8_t newleap = 0;
+        uint8_t subhash = 0;
+        if (aftertail > 0)
         {
             int dist = table_index_dist(table, tailindex, emptyindex);
-            uint8_t newleap = HEAD & tailslot->leaps[index_sub(tailindex)];
-            uint8_t subhash = 0;
+            uint8_t tailleap = HEAD & tailslot->leaps[index_sub(tailindex)];
             if (dist < LEAPMAX)
             {
-                newleap |= dist;
+                tailleap |= dist;
                 subhash = hash_sub(hash);
             }
             else
@@ -1003,20 +1042,18 @@ table_emplace(hashmap_t * const map,
                 {
                     dist = LEAPMAX - 1;
                 }
-                newleap |= SEARCH | dist;
+                tailleap |= SEARCH | dist;
                 subhash = tailslot->hashes[index_sub(tailindex)];
             }
 
-            tailslot->leaps[index_sub(tailindex)] = newleap;
-
-            return table_place(map, table, slot, index_sub(emptyindex),
-                               subhash, 0, key, val);
+            tailslot->leaps[index_sub(tailindex)] = tailleap;
         }
         else
         {
-            // We should never get here.
-            return HASHCODE_ERROR;
         }
+
+        return table_place(map, table, slot, index_sub(emptyindex),
+                           subhash, newleap, key, val);
     }
 }
 
@@ -1246,7 +1283,7 @@ table_insert(hashmap_t * const map,
     }
     while (false);
 
-#if DEBUG
+#if DEBUG || INVARIANT
     hashmap_invariant(map);
 #endif
 
@@ -1714,7 +1751,6 @@ head_invariant(hashmap_t const * const map,
         previndex = index;
         index = table_leap(map, table, slot, headindex, index, &notrust);
     }
-    printf("%d\n", listlen);
 
     return listlen;
 }
