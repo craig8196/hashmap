@@ -1794,11 +1794,30 @@ hashmap_invariant(hashmap_t const * const map)
             break;
         case HSMALL:
             {
+                if (1 != map->tablen)
+                {
+                    hashmap_print(map);
+                    printf("Invalid table length for SMALL type: is [%d] expected [1]\n", map->tablen);
+                    exit(1);
+                }
                 tables = (table_t **)&(map->tables);
             }
             break;
         case HEMPTY:
             {
+                if (0 != map->tablen)
+                {
+                    hashmap_print(map);
+                    printf("Invalid table length for EMPTY type: is [%d] expected [0]\n", map->tablen);
+                    exit(1);
+                }
+            }
+            break;
+        default:
+            {
+                hashmap_print(map);
+                printf("Invalid table type: is [%d] expected [0,1,2]\n", map->tabtype);
+                exit(1);
             }
             break;
     }
