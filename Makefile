@@ -9,6 +9,12 @@ TDIR = ./test
 ODIR = ./obj
 LDIR = ./lib
 
+AR = ar
+CC = gcc
+CFLAGS = -Wall -Wextra -Werror -pedantic -msse2 -g $(DEBUG) $(OPS) $(PROF)
+IFLAGS = -I$(IDIR)
+LIBS =
+
 PROF = 
 ifdef prof
 ifeq ($(prof), coverage)
@@ -45,12 +51,9 @@ ifdef invariant
 DEFINES += -DINVARIANT
 endif
 
-AR = ar
-CC = gcc
-CFLAGS = -Wall -Wextra -Werror -pedantic -msse2 -g $(DEBUG) $(OPS) $(PROF)
-IFLAGS = -I$(IDIR)
-
-LIBS =
+ifdef cpp
+CC = g++
+endif
 
 SRC = $(wildcard $(SDIR)/*.c)
 OBJS = $(patsubst $(SDIR)/%.c, $(ODIR)/%.o, $(SRC))

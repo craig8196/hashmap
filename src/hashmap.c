@@ -44,7 +44,7 @@ typedef struct slot_s
 {
     uint8_t       hashes[16];
     uint8_t       leaps[16];
-    char          entries[];
+    // char         entries[];
 }
 slot_t;
 
@@ -55,7 +55,7 @@ typedef struct table_s
     int           elmask;
     int           slotmask;
     int           index;
-    char          slots[];
+    //char          slots[];
 }
 table_t;
 
@@ -346,7 +346,7 @@ slot_key(hashmap_t const * const map,
          slot_t const * const slot,
          const int subindex)
 {
-    return (const void *)(slot->entries + (map->elsize * subindex));
+    return (const void *)((char const * const)slot + sizeof(slot_t) + (map->elsize * subindex));
 }
 
 /**
@@ -357,7 +357,7 @@ slot_val(hashmap_t const * const map,
          slot_t const * const slot,
          const int subindex)
 {
-    return (const void *)(slot->entries + (map->elsize * subindex) + map->keysize);
+    return (const void *)((char const * const)slot + sizeof(slot_t) + (map->elsize * subindex) + map->keysize);
 }
 
 /**
@@ -423,6 +423,12 @@ table_shift(int len)
     return (len - 1);
 }
 
+static inline const char *
+table_slots(table_t const * const table)
+{
+    return ((char const * const)table + sizeof(table_t));
+}
+
 /**
  * @return Slot mask.
  */
@@ -469,7 +475,7 @@ table_slot(hashmap_t const * const map,
            table_t const * const table,
            const int sindex)
 {
-    return (slot_t *)(table->slots + (map->slotsize * sindex));
+    return (slot_t *)(table_slots(table) + (map->slotsize * sindex));
 }
 
 /**
@@ -584,7 +590,7 @@ table_clear(table_t * const table,
 {
     table->size = 0;
     int i;
-    slot_t *m = (slot_t *)table->slots;
+    slot_t *m = (slot_t *)table_slots(table);
     int slen = table_slot_len(table);
     for (i = 0; i < slen; ++i)
     {
@@ -808,7 +814,7 @@ table_grow(hashmap_t * const map,
                 else
                 {
                     // Upgrade to big hashmap.
-                    table_t **tables = malloc(sizeof(table_t *) * 2);
+                    table_t **tables = (table_t **)malloc(sizeof(table_t *) * 2);
 
                     if (NULL == tables)
                     {
@@ -2071,10 +2077,10 @@ void
 hashmap_print(hashmap_t const * const map)
 {
     int64_t octets = sizeof(hashmap_t);
-    printf("\n"LINE);
+    printf("\n" LINE);
     printf("METADATA\n");
     printf(LINE);
-    printf("Fibonacci: %"PRIu64"\n", FIB);
+    printf("Fibonacci: %" PRIu64 "\n", FIB);
     printf("Max length: %d\n", HASHMAP_MAX_LEN);
     printf("Empty: 0x%X\n", (int)EMPTY);
     printf(LINE);
@@ -2161,7 +2167,7 @@ hashmap_print(hashmap_t const * const map)
     }
 
     printf(LINE);
-    printf("Total Octets: %"PRIu64"\n", octets);
+    printf("Total Octets: %" PRIu64 "\n", octets);
     printf("END\n");
     printf(LINE);
 }
