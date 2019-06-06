@@ -233,6 +233,34 @@ pwr2(int n, const int min, const int max)
 }
 #endif
 
+/**
+ * @brief Quickly copy data.
+ */
+static inline void
+copydata(void *to, const void *from, int size)
+{
+    switch (size)
+    {
+        case 0:
+            break;
+        case sizeof(uint8_t):
+            *((uint8_t *)to) = *((uint8_t *)from);
+            break;
+        case sizeof(uint16_t):
+            *((uint16_t *)to) = *((uint16_t *)from);
+            break;
+        case sizeof(uint32_t):
+            *((uint32_t *)to) = *((uint32_t *)from);
+            break;
+        case sizeof(uint64_t):
+            *((uint64_t *)to) = *((uint64_t *)from);
+            break;
+        default:
+            memcpy(to, from, size);
+            break;
+    }
+}
+
 /******************************************************************************
  * BEGIN SLOT
  ******************************************************************************/
@@ -345,13 +373,13 @@ slot_export(hashmap_t const * const map,
     if (kout)
     {
         const void *key = slot_key(map, slot, subindex);
-        memcpy(kout, key, map->keysize);
+        copydata(kout, key, map->keysize);
     }
 
     if (vout)
     {
         const void *val = slot_val(map, slot, subindex);
-        memcpy(vout, val, map->valsize);
+        copydata(vout, val, map->valsize);
     }
 }
 
@@ -495,7 +523,7 @@ table_copy_entry(hashmap_t const * const map,
     slot_t *tslot = table_slot(map, table, tsub);
     const void *f = slot_key(map, fslot, fsub);
     void *t = (void *)slot_key(map, tslot, tsub);
-    memcpy(t, f, map->elsize);
+    copydata(t, f, map->elsize);
 }
 
 /**
@@ -529,12 +557,9 @@ table_place(hashmap_t *const map,
 {
     slot->hashes[subindex] = subhash;
     slot->leaps[subindex] = leap;
-    void *el = &slot->entries[map->elsize * subindex];
-    memcpy(el, key, map->keysize);
-    if (map->valsize)
-    {
-        memcpy(el, val, map->valsize);
-    }
+    char *el = (char *)slot_key(map, slot, subindex);
+    copydata(el, key, map->keysize);
+    copydata((char *)el + map->keysize, val, map->valsize);
     ++map->size;
     ++table->size;
 

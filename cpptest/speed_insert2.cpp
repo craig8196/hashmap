@@ -54,7 +54,7 @@ main(void)
 
     srand(SEED);
     
-    const int max_iter = 1024*1024;
+    const int max_iter = 1024*100;
     const int max_len = 1024;
     int len = max_len;
     hashel_t *els = (hashel_t *)calloc(len, sizeof(hashel_t));
@@ -90,8 +90,6 @@ main(void)
     struct timespec start;
     struct timespec end;
 
-    std::unordered_map<int, bool> u;
-
     if (clock_gettime(CLOCK_REALTIME, &start))
     {
         printf("Error getting start time: %d, %s\n", errno, strerror(errno));
@@ -101,13 +99,13 @@ main(void)
     int j;
     for (j = 0; j < max_iter; ++j)
     {
+        std::unordered_map<int, bool> u;
         int k;
         for (k = 0; k < len; ++k)
         {
             hashel_t *el = &els[k];
             u.insert({ el->val, true });
         }
-        u.clear();
     }
 
     if (clock_gettime(CLOCK_REALTIME, &end))

@@ -28,26 +28,28 @@ main(void)
     struct timespec start;
     struct timespec end;
 
-    hashmap_t map;
-    hashmap_init(&map, sizeof(n[0]), 0, int_hash_cb, int_eq_cb);
-
     if (clock_gettime(CLOCK_REALTIME, &start))
     {
         printf("Error getting start time: %d, %s\n", errno, strerror(errno));
         return errno;
     }
 
+    hashmap_t map;
+
     int *nums = n;
     int j;
+    bool bval = true;
     for (j = 0; j < max_iter; ++j)
     {
+        hashmap_init(&map, sizeof(n[0]), sizeof(bool), int_hash_cb, int_eq_cb);
         nums = &n[j];
         int k;
         for (k = 0; k < max_len; ++k)
         {
-            hashmap_insert(&map, &nums[k], NULL);
+            hashmap_insert(&map, &nums[k], &bval);
         }
-        hashmap_clear(&map);
+        //hashmap_clear(&map);
+        hashmap_destroy(&map);
     }
 
     if (clock_gettime(CLOCK_REALTIME, &end))
@@ -55,8 +57,6 @@ main(void)
         printf("Error getting end time: %d, %s\n", errno, strerror(errno));
         return errno;
     }
-
-    hashmap_destroy(&map);
 
     double seconds = (double)(end.tv_sec - start.tv_sec) + ((double)end.tv_nsec - (double)start.tv_nsec)/1000000000;
 
