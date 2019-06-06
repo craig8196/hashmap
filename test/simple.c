@@ -59,22 +59,23 @@ main(void)
         hashmap_init(map, sizeof(int), 0, int_hash_cb, int_eq_cb);
         int size = 0;
         int i;
-        for (i = 0; i < 40000; ++i)
+        for (i = 0; i < 10000; ++i)
         {
             int el = i;
             int *key = &el;
 
             hashcode_t c = hashmap_insert(map, key, NULL);
-#if DEBUG
             if (c)
             {
-                hashmap_print(map);
                 printf("Code: %d\n", c);
             }
-#endif
             assert(HASHCODE_OK == c && "Failed insert");
 
             hashcode_t code = hashmap_insert(map, key, NULL);
+            if (code != HASHCODE_EXIST)
+            {
+                printf("Code: %d\n", code);
+            }
             assert(HASHCODE_EXIST == code && "Failed reinsert");
 
             assert(hashmap_contains(map, key) && "Failed contains");
@@ -92,15 +93,25 @@ main(void)
         hashmap_init(map, sizeof(int), 0, int_hash_cb, int_eq_cb);
         int size = 0;
         int i;
-        for (i = 0; i < 70000; ++i)
+        for (i = 0; i < 40000; ++i)
         {
             int el = i * 8;
             int *key = &el;
 
             hashcode_t c = hashmap_insert(map, key, NULL);
+            if (c)
+            {
+                hashmap_print_stats(map);
+                hashmap_invariant(map);
+                printf("Code: %d\n", c);
+            }
             assert(HASHCODE_OK == c && "Failed insert");
 
             hashcode_t code = hashmap_insert(map, key, NULL);
+            if (code != HASHCODE_EXIST)
+            {
+                printf("Code: %d\n", code);
+            }
             assert(HASHCODE_EXIST == code && "Failed reinsert");
 
             assert(hashmap_contains(map, key) && "Failed contains");
@@ -137,6 +148,10 @@ main(void)
             assert(HASHCODE_OK == c && "Failed insert");
 
             hashcode_t code = hashmap_insert(map, key, NULL);
+            if (code != HASHCODE_EXIST)
+            {
+                printf("Code: %d\n", (int)code);
+            }
             assert(HASHCODE_EXIST == code && "Failed reinsert");
 
             assert(hashmap_contains(map, key) && "Failed contains");

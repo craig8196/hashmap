@@ -91,7 +91,13 @@ static const uint8_t SEARCH = 0x40;
 /**
  * Max distance before we switch to block searching.
  */
-static const int LEAPMAX = 16;
+//static const int LEAPMAX = 1 << 4;
+static const int LEAPMAX = 1 << 6;
+
+/**
+ * Minimum BIG table allocation.
+ */
+static const int HBIGMIN = 1 << 13;
 
 /**
  * Number of elements per slot.
@@ -116,9 +122,14 @@ hash_fib(uint32_t hash)
 static inline uint8_t
 hash_sub(uint32_t hash)
 {
+#if 0
+    // Another variant I would like to try.
 //    hash ^= (hash >> ((sizeof(hash) * 8)/2));
 //    hash ^= (hash >> ((sizeof(hash) * 8)/4));
 //    return (hash & 0x7F);
+    // For when I experiment with moving the EMPTY check to leaps
+//    return (hash & 0xFF);
+#endif
     uint8_t *into = (uint8_t *)(&hash);
     return ((into[0] ^ into[1] ^ into[2] ^ into[3]) & 0x7F);
 //    return ((uint8_t)(hash >> 16) & 0x7F);
@@ -161,6 +172,15 @@ index_from(int sindex,
            int subindex)
 {
     return ((sindex * SLOTLEN) + subindex);
+}
+
+/**
+ * @return Peer index when indexing into table of tables.
+ */
+static inline int
+index_peer(int index, int len)
+{
+    return ((len >> 1) ^ index);
 }
 
 /**
@@ -333,6 +353,15 @@ slot_export(hashmap_t const * const map,
         const void *val = slot_val(map, slot, subindex);
         memcpy(vout, val, map->valsize);
     }
+}
+
+/**
+ * @brief Perform the necessary cast.
+ */
+static inline table_t **
+map_tables(hashmap_t const * const map)
+{
+    return (table_t **)map->tables;
 }
 
 /******************************************************************************
@@ -602,27 +631,106 @@ table_iterate_readd_cb(void *ud,
 }
 
 static inline hashcode_t
-//table_grow_big(hashmap_t * const map, table_t **table)
-table_grow_big()
+table_grow_big(hashmap_t * const map,
+               table_t **table,
+               const uint32_t hash)
 {
-    printf("BIG??? NOT YET IMPLEMENTED\n");
-    exit(1);
-    // TODO
-    // When do we grow the table? If small, or we can't split/increase tables.
-    // When do we split tables? If there is space to do so.
-    // When do we increase table count? If we can't increase table. If we can't currently split but can grow then flip a coin.
-    // How do we detect a bad hash? If peer table isn't within 25%??
-    return HASHCODE_ERROR;
+    hashcode_t code = HASHCODE_OK;
+
+    int origmapsize = map->size;
+    int index = (*table)->index;
+    int peer = index_peer(index, map->tablen);
+    table_t **tables = map_tables(map);
+    do
+    {
+        if (tables[index] == tables[peer])
+        {
+            // Split current table if it is splitable.
+            table_t *indextable = table_new(index, table_slot_len(*table), map->slotsize);
+            if (NULL == indextable)
+            {
+                code = HASHCODE_NOMEM;
+                break;
+            }
+            table_t *peertable = table_new(peer, table_slot_len(*table), map->slotsize);
+            if (NULL == peertable)
+            {
+                free(indextable);
+                code = HASHCODE_NOMEM;
+                break;
+            }
+            tables[index] = indextable;
+            tables[peer] = peertable;
+
+            map->size -= (*table)->size;
+            code = table_iterate(map, *table, (void *)map, table_iterate_readd_cb);
+            map->size = origmapsize;
+            if (code)
+            {
+                tables[index] = *table;
+                tables[peer] = *table;
+                free(peertable);
+                free(indextable);
+            }
+            else
+            {
+                free(*table);
+                *table = tables[table_choose(map, hash)];
+            }
+            break;
+        }
+#if 0
+        // I need to develop a good heuristic for this case.
+        else if (map_is_)
+        {
+        }
+#endif
+        else
+        {
+            // Increase the size of the current table.
+            int slen = table_slot_len(*table) * 2;
+            if (slen <= 0)
+            {
+                code = HASHCODE_NOSPACE;
+                break;
+            }
+            table_t *newtable = table_new(index, slen, map->slotsize);
+            
+            if (NULL == newtable)
+            {
+                code = HASHCODE_NOMEM;
+                break;
+            }
+
+            tables[index] = newtable;
+            map->size -= (*table)->size;
+            code = table_iterate(map, *table, (void *)map, table_iterate_readd_cb);
+            map->size = origmapsize;
+            if (code)
+            {
+                map->size = (*table)->size;
+                tables[index] = *table;
+                free(newtable);
+            }
+            else
+            {
+                free(*table);
+                *table = newtable;
+            }
+            break;
+        }
+    }
+    while (false);
+
+    return code;
 }
 
 static hashcode_t
 table_grow(hashmap_t * const map,
-           table_t **table)
+           table_t **table,
+           uint32_t hash)
 {
-    //static const int HSMALL_MIN = 1 << 15;
-    //static const int HSMALL_MAX = 1 << 16;
-
-    if (HASHMAP_MAX_LEN == map->size)
+    if (HASHMAP_MAX_LEN <= map->size)
     {
         return HASHCODE_NOSPACE;
     }
@@ -633,15 +741,13 @@ table_grow(hashmap_t * const map,
     {
         case HBIG:
             {
-                code = table_grow_big(map, table);
+                code = table_grow_big(map, table, hash);
             }
             break;
         case HSMALL:
             {
-#if 0
-                if (map->size <= HSMALL_MIN)
+                if (map->size <= HBIGMIN)
                 {
-#endif
                     // Just regrow this table.
                     int slen = table_slot_len(*table) * 2;
                     if (slen <= 0)
@@ -663,17 +769,16 @@ table_grow(hashmap_t * const map,
                     if (code)
                     {
                         map->size = (*table)->size;
-                        map->tables = table;
+                        map->tables = *table;
                         free(newtable);
                         break;
                     }
                     else
                     {
                         free(*table);
-                        *table = (table_t *)map->tables;
+                        *table = newtable;
                         break;
                     }
-#if 0
                 }
                 else
                 {
@@ -689,11 +794,11 @@ table_grow(hashmap_t * const map,
                     map->tabtype = HBIG;
                     map->tablen = 2;
                     map->tabshift = table_shift(map->tablen);
+                    map->tables = tables;
                     tables[0] = (table_t *)map->tables;
                     tables[1] = (table_t *)map->tables;
-                    code = table_grow(map, table);
+                    code = table_grow(map, table, hash);
                 }
-#endif
             }
             break;
     }
@@ -993,7 +1098,7 @@ table_emplace(hashmap_t * const map,
 {
     if (table_is_full(table))
     {
-        hashcode_t code = table_grow(map, &table);
+        hashcode_t code = table_grow(map, &table, hash);
         if (code)
         {
             return code;
@@ -1100,7 +1205,7 @@ table_re_emplace(hashmap_t * const map,
 {
     if (table_is_full(table))
     {
-        hashcode_t code = table_grow(map, &table);
+        hashcode_t code = table_grow(map, &table, hash);
         if (code)
         {
             return code;
@@ -1335,8 +1440,10 @@ table_remove(hashmap_t * const map,
                         {
                             // Unlink and copy the next item.
                             previndex = index;
-                            index = table_leap(map, table, slot, headindex, index, &notrust);
-                            table_unlink(map, table, headindex, previndex, index);
+                            index = table_leap(map, table, slot,
+                                               headindex, index, &notrust);
+                            table_unlink(map, table,
+                                         headindex, previndex, index);
                             slot_export(map, slot, kout, vout, subindex);
                             table_copy_entry(map, table, index, headindex);
                             slot = table_slot(map, table, index_slot(index));
@@ -1476,7 +1583,7 @@ hashmap_get(hashmap_t const * const map,
     {
         case HBIG:
             {
-                table = ((table_t **)map->tables)[table_choose(map, hash)];
+                table = map_tables(map)[table_choose(map, hash)];
             }
             break;
         case HSMALL:
@@ -1618,7 +1725,7 @@ hashmap_insert(hashmap_t * const map,
     {
         case HBIG:
             {
-                table = ((table_t **)map->tables)[table_choose(map, hash)];
+                table = map_tables(map)[table_choose(map, hash)];
             }
             break;
         case HSMALL:
@@ -1657,7 +1764,7 @@ hashmap_remove(hashmap_t * const map,
     {
         case HBIG:
             {
-                table = ((table_t **)map->tables)[table_choose(map, hash)];
+                table = map_tables(map)[table_choose(map, hash)];
             }
             break;
         case HSMALL:
@@ -2043,6 +2150,7 @@ static int
 head_count(hashmap_t const * const map,
            table_t const * const table,
            const int headindex,
+           int64_t *dists,
            int *stats)
 {
     int overflow = 0;
@@ -2055,6 +2163,7 @@ head_count(hashmap_t const * const map,
         if (i < STATLEN)
         {
             ++stats[i];
+            dists[i] += table_index_dist(table, headindex, index);
         }
         else
         {
@@ -2079,6 +2188,7 @@ head_count(hashmap_t const * const map,
 static int
 table_print_stats(hashmap_t const * const map,
                   table_t const * const table,
+                  int64_t *dists,
                   int *totals)
 {
     int stats[STATLEN] = { 0 };
@@ -2101,7 +2211,8 @@ table_print_stats(hashmap_t const * const map,
                 if (leap & HEAD)
                 {
                     // We have a valid head of a list.
-                    overflow += head_count(map, table, index_from(i, sub), stats);
+                    overflow += head_count(map, table, index_from(i, sub),
+                                           dists, stats);
                 }
             }
         }
@@ -2140,31 +2251,54 @@ hashmap_print_stats(hashmap_t const * const map)
 
     if (map->size)
     {
+        int64_t dists[STATLEN] = { 0 };
         int totals[STATLEN] = { 0 };
         int overflow = 0;
 
+        printf("TABLE\n");
         double dsize = (double)map->size;
         int i;
         for (i = 0; i < map->tablen; ++i)
         {
             table_t *table = tables[i];
-            overflow += table_print_stats(map, table, totals);
+            if (table->index == i)
+            {
+                printf("%.03d: %.04f (%d)\n",
+                       i, (double)table->size/dsize, table->size);
+            }
+            else
+            {
+                printf("%.03d: duplicate of %d\n", i, table->index);
+            }
         }
 
+        for (i = 0; i < map->tablen; ++i)
+        {
+            table_t *table = tables[i];
+            overflow += table_print_stats(map, table, dists, totals);
+        }
+
+        printf("LINKED LIST\n");
         for (i = 0; i < STATLEN; ++i)
         {
-            printf("%.02d: %.04f (%d)\n", (i + 1), (double)totals[i]/dsize, totals[i]);
+            int llindex = i;
+            double percenttotal = (double)totals[i]/dsize;
+            int lltotal = totals[i];
+            double avgdist = 0.0;
+            if (totals[i])
+            {
+                avgdist = (double)dists[i]/(double)totals[i];
+            }
+            printf("%.02d: %.04f (%d) avg dist (%.04f)\n",
+                   llindex, percenttotal, lltotal, avgdist);
         }
 
-        printf("Over %d: %.04f (%d)\n", STATLEN, (double)overflow/dsize, overflow);
+        printf("Over %d: %.04f (%d)\n",
+               STATLEN, (double)overflow/dsize, overflow);
     }
     else
     {
         printf("No stats (empty)\n");
     }
 }
-
-/******************************************************************************
- * END
- ******************************************************************************/
 
