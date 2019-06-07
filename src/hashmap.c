@@ -931,12 +931,6 @@ table_cascade(hashmap_t const * const map,
               int nextindex,
               uint8_t subhash)
 {
-#if DEBUG
-    printf("CASCADE\n");
-#endif
-#if DEBUG
-    printf("NextLeap: %X\n", (int)nextslot->leaps[index_sub(nextindex)]);
-#endif
     for (;;)
     {
         bool scratch;
@@ -948,10 +942,6 @@ table_cascade(hashmap_t const * const map,
         nextslot = table_slot(map, table, index_slot(nnindex));
         // Get the next mask.
         uint8_t nnleap = nextslot->leaps[index_sub(nnindex)];
-#if DEBUG
-        printf("NNIndex: %d\n", nnindex);
-        printf("NNextLeap: %X\n", (int)nnleap);
-#endif
         nextindex = nnindex;
 
         if (0 == (LEAP & nnleap))
@@ -991,26 +981,16 @@ table_unlink(hashmap_t * const map,
 
     if (0 == (unleap & LEAP))
     {
-#if DEBUG
-            printf("UNLINK TAIL\n");
-#endif
         prevslot->leaps[index_sub(previndex)] = HEAD & prevleap;
     }
     else
     {
-#if DEBUG
-            printf("REPLACE LINK\n");
-#endif
-
         bool badsearch = true;
         if (!(prevleap & SEARCH) && !(unleap & SEARCH))
         {
             int dist = (int)(prevleap & LEAP) + (int)(unleap & LEAP);
             if (dist < LEAPMAX)
             {
-#if DEBUG
-                printf("EASY RELINK\n");
-#endif
                 // Good, we don't have to resort to inefficient searching.
                 prevslot->leaps[index_sub(previndex)] =
                     (prevleap & HEAD) | ((uint8_t)dist);
@@ -1023,21 +1003,12 @@ table_unlink(hashmap_t * const map,
 
         if (badsearch)
         {
-#if DEBUG
-            printf("HARD RELINK\n");
-#endif
             int prevsindex = index_slot(previndex);
             int nextsindex = index_slot(nextindex);
             int dist =
                 (nextsindex < prevsindex)
                 ? ((nextsindex + table_slot_len(table)) - prevsindex)
                 : (nextsindex - prevsindex);
-#if DEBUG
-            printf("head: %d\n", headindex);
-            printf("prev: %d %d %d\n", previndex, prevsindex, index_sub(previndex));
-            printf("next: %d %d %d\n", nextindex, nextsindex, index_sub(nextindex));
-            printf("dist: %d\n", dist);
-#endif
 
             uint8_t newleap;
             if (dist < LEAPMAX)
@@ -1054,14 +1025,8 @@ table_unlink(hashmap_t * const map,
             uint8_t prevsubhash = prevslot->hashes[index_sub(previndex)];
             if (SEARCH & nextslot->leaps[index_sub(nextindex)])
             {
-#if DEBUG
-                printf("CASCADE\n");
-#endif
                 int nindex = nextindex;
                 slot_t *nslot = nextslot;
-#if DEBUG
-                printf("NextLeap: %X\n", (int)nextslot->leaps[index_sub(nextindex)]);
-#endif
                 for (;;)
                 {
                     bool scratch;
@@ -1073,10 +1038,6 @@ table_unlink(hashmap_t * const map,
                     nslot = table_slot(map, table, index_slot(nnindex));
                     // Get the next mask.
                     uint8_t nnleap = nslot->leaps[index_sub(nnindex)];
-#if DEBUG
-                    printf("NNIndex: %d\n", nnindex);
-                    printf("NNextLeap: %X\n", (int)nnleap);
-#endif
                     nindex = nnindex;
                     if (0 == (LEAP & nnleap))
                     {
@@ -1095,9 +1056,6 @@ table_unlink(hashmap_t * const map,
             }
             else
             {
-#if DEBUG
-                    printf("SINGLE CASCADE\n");
-#endif
                     // Correct the next index's subhash.
                     nextslot->hashes[index_sub(nextindex)] = prevsubhash;
             }
@@ -1206,27 +1164,15 @@ table_emplace(hashmap_t * const map,
     else
     {
         // Find an empty slot.
-#if DEBUG
-        printf("EMPLACE HEAD: %d\n", headindex);
-        printf("EMPLACE TAIL: %d\n", tailindex);
-#endif
         slot_t *slot = table_slot(map, table, index_slot(tailindex));
         int emptyindex = table_find_empty(map, table, slot, tailindex);
         // Update slot pointer to point to empty for placement.
-        slot = table_slot(map, table, index_slot(emptyindex));
         int aftertail = index_loc(headindex, tailindex, emptyindex, table_len(table), table_el_mask(table));
-
-#if DEBUG
-        printf("EMPLACE EMPTY: %d\n", emptyindex);
-        printf("LEN: %X\n", table_len(table));
-        printf("MASK: %X\n", table_el_mask(table));
-        printf("AFTER TAIL: %d\n", aftertail);
-#endif
-
 
         uint8_t newleap = 0;
         if (aftertail > 0)
         {
+            slot = table_slot(map, table, index_slot(emptyindex));
             subhash = table_link(table, tailslot, tailindex, emptyindex, subhash);
             table_place(map, table, slot, index_sub(emptyindex),
                         subhash, newleap, key, val);
@@ -1251,12 +1197,14 @@ table_emplace(hashmap_t * const map,
             }
 
             slot_t *prevslot = table_slot(map, table, index_slot(previndex));
-            subhash = table_link(table, prevslot, previndex, emptyindex, subhash);
-            table_place(map, table, slot, index_sub(emptyindex),
-                        subhash, newleap, key, val);
+            slot_t *emptyslot = table_slot(map, table, index_slot(emptyindex));
             slot_t *nextslot = table_slot(map, table, index_slot(index));
+
+            subhash = table_link(table, prevslot, previndex, emptyindex, subhash);
+            table_place(map, table, emptyslot, index_sub(emptyindex),
+                        subhash, newleap, key, val);
             subhash = slot_hash_sub(map, nextslot, index_sub(index));
-            subhash = table_link(table, slot, emptyindex, index, subhash);
+            subhash = table_link(table, emptyslot, emptyindex, index, subhash);
             nextslot->hashes[index_sub(index)] = subhash;
 
             return HASHCODE_OK;
@@ -1523,7 +1471,7 @@ table_remove(hashmap_t * const map,
                         else
                         {
                             // Transfer the hash
-                            slot->hashes[subindex] = removedslot->hashes[removedsub];
+                            slot->hashes[subindex] = slot_hash_sub(map, slot, subindex);
                         }
                         // Update so slot and subindex point to removed index.
                         slot = removedslot;
@@ -1875,9 +1823,12 @@ head_invariant(hashmap_t const * const map,
         int origindex = table_hash_index(table, hash);
         if (origindex != headindex)
         {
+#ifdef VERBOSE
             hashmap_print(map);
+#endif
             printf("Entry index wrong list: is [%d] expected [%d] at [%d]\n",
                    origindex, headindex, index);
+            fflush(stdout);
             exit(1);
         }
 
@@ -1887,21 +1838,30 @@ head_invariant(hashmap_t const * const map,
             int revisedprevindex = previndex < headindex ? previndex + len : previndex;
             if (revisedindex < revisedprevindex)
             {
+#ifdef VERBOSE
                 hashmap_print(map);
+#endif
                 printf("Invalid index progression: prev|norm [%d|%d] curr|norm [%d|%d] len [%d]\n",
                        previndex, revisedprevindex, index, revisedindex, len);
+                fflush(stdout);
                 exit(1);
             }
             else if (index == headindex)
             {
+#ifdef VERBOSE
                 hashmap_print(map);
+#endif
                 printf("Cycle, starting back at head: head[%d]\n", headindex);
+                fflush(stdout);
                 exit(1);
             }
             else if (index == previndex)
             {
+#ifdef VERBOSE
                 hashmap_print(map);
+#endif
                 printf("Cycle, index = previndex: index [%d]\n", index);
+                fflush(stdout);
                 exit(1);
             }
         }
@@ -1910,9 +1870,12 @@ head_invariant(hashmap_t const * const map,
         {
             if (subhash != slot->hashes[index_sub(index)])
             {
+#ifdef VERBOSE
                 hashmap_print(map);
+#endif
                 printf("Subhash error: is [%X] expected [%X] at [%d]\n",
                        (int)slot->hashes[index_sub(index)], (int)subhash, index);
+                fflush(stdout);
                 exit(1);
             }
         }
@@ -1954,8 +1917,11 @@ table_invariant(hashmap_t const * const map,
     int size = maxentries - emptycount;
     if (size != table->size)
     {
+#ifdef VERBOSE
         hashmap_print(map);
+#endif
         printf("Table size error: is [%d] expected [%d]\n", table->size, size);
+        fflush(stdout);
         exit(1);
     }
 
@@ -1984,8 +1950,11 @@ table_invariant(hashmap_t const * const map,
 
     if (traversed != table->size)
     {
+#ifdef VERBOSE
         hashmap_print(map);
+#endif
         printf("Traversed more items than table should have: is [%d] expected [%d]\n", traversed, table->size);
+        fflush(stdout);
         exit(1);
     }
 }
@@ -2006,8 +1975,11 @@ hashmap_invariant(hashmap_t const * const map)
             {
                 if (1 != map->tablen)
                 {
+#ifdef VERBOSE
                     hashmap_print(map);
+#endif
                     printf("Invalid table length for SMALL type: is [%d] expected [1]\n", map->tablen);
+                    fflush(stdout);
                     exit(1);
                 }
                 tables = (table_t **)&(map->tables);
@@ -2017,16 +1989,22 @@ hashmap_invariant(hashmap_t const * const map)
             {
                 if (0 != map->tablen)
                 {
+#ifdef VERBOSE
                     hashmap_print(map);
+#endif
                     printf("Invalid table length for EMPTY type: is [%d] expected [0]\n", map->tablen);
+                    fflush(stdout);
                     exit(1);
                 }
             }
             break;
         default:
             {
+#ifdef VERBOSE
                 hashmap_print(map);
+#endif
                 printf("Invalid table type: is [%d] expected [0,1,2]\n", map->tabtype);
+                fflush(stdout);
                 exit(1);
             }
             break;
@@ -2048,8 +2026,11 @@ hashmap_invariant(hashmap_t const * const map)
 
     if (map->size != size)
     {
+#ifdef VERBOSE
         hashmap_print(map);
+#endif
         printf("Map size fail: is [%d] expected [%d]\n", map->size, size);
+        fflush(stdout);
         exit(1);
     }
 }
