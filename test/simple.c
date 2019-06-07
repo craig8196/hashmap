@@ -83,6 +83,7 @@ main(void)
             ++size;
             assert(size == hashmap_size(map) && "Failed size 1");
         }
+        hashmap_invariant(map);
         // Stats from this look good.
         hashmap_print_stats(map);
         hashmap_destroy(map);
@@ -119,6 +120,7 @@ main(void)
             ++size;
             assert(size == hashmap_size(map) && "Failed size 1");
         }
+        hashmap_invariant(map);
         // Stats from this look good.
         hashmap_print_stats(map);
         hashmap_destroy(map);
@@ -159,6 +161,7 @@ main(void)
             ++size;
             assert(size == hashmap_size(map) && "Failed size 1");
         }
+        hashmap_invariant(map);
         // Stats from this look good.
         hashmap_print_stats(map);
         hashmap_destroy(map);

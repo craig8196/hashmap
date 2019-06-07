@@ -51,8 +51,14 @@ ifdef invariant
 DEFINES += -DINVARIANT
 endif
 
-ifdef cpp
-CC = g++
+ifdef compiler
+ifneq ($(strip $(compiler)),)
+CC = $(compiler)
+endif
+endif
+
+ifdef inline
+CFLAGS += -finline-functions
 endif
 
 SRC = $(wildcard $(SDIR)/*.c)

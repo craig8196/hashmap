@@ -6,93 +6,54 @@
 #include <time.h>
 
 #include "hashmap.h"
+#include "util.h"
 
 
-typedef enum hashstate_e
+typedef enum state_e
 {
-    HASHSTATE_OUT = 0,
-    HASHSTATE_IN  = 1,
-} hashstate_t;
+    STATE_OUT = 0,
+    STATE_IN  = 1,
+} state_t;
 
-typedef enum hashaction_e
+typedef enum action_e
 {
-    HASHACTION_CON = 0, // Contains.
-    HASHACTION_INS = 1, // Insert.
-    HASHACTION_DEL = 2, // Delete/Remove.
-} hashaction_t;
+    ACTION_HAS = 0, // Contains.
+    ACTION_INS = 1, // Insert.
+    ACTION_DEL = 2, // Delete/Remove.
+} action_t;
 
-#define MAX_ACTIONS (3)
+#define MAX_ACTIONS (2)
 
-typedef struct hashel_s
+typedef struct entry_s
 {
     int val;
-    hashstate_t state;
-    hashaction_t actions[MAX_ACTIONS];
-} hashel_t;
+    state_t state;
+    action_t actions[MAX_ACTIONS];
+} entry_t;
 
-static uint32_t
-hash_cb(const void *key)
+void
+runtest(hashmap_t *map, int len, int forceseed)
 {
-    return (uint32_t)(*((int *)key));
-}
-
-static bool
-eq_cb(const void *key1, const void *key2)
-{
-    int k1 = *((int *)key1);
-    int k2 = *((int *)key2);
-    return k1 == k2;
-}
-
-/**
- * @see http://c-faq.com/lib/randrange.html
- * @return Random int value in [low, high].
- */
-static int
-myrand(int low, int high)
-{
-    int r = low + (rand() / ((RAND_MAX / (high - low + 1)) + 1));
-    assert((low <= r && r <= high) && "Invalid random number generated");
-    return r;
-}
-
-int
-main(void)
-{
-    const int SEED = (int)time(NULL);
-    // Previously this seed caused a segfault.
-    // const int SEED = 1545011861;
-    // const int SEED = 1552696998;
-
-    printf("SEED: %d\n", SEED);
-
-    srand(SEED);
-    
-    hashmap_t map;
-
-    hashmap_init(&map, 0, sizeof(int), 0, hash_cb, eq_cb);
-
-    int len = myrand(1, 20000);
-    hashel_t *els = calloc(len, sizeof(hashel_t));
-    int step = myrand(1, 2000);
-    int lowval = myrand(-300, 0);
-    int nextval = lowval;
+    int seed;
+    int *n = rand_intarr_new(len, &seed, forceseed);
+    entry_t *e = (entry_t *)malloc(sizeof(entry_t) * len);
+    printf("SEED: %d\n", seed);
 
     int i;
     for (i = 0; i < len; ++i)
     {
-        hashel_t *el = &els[i];
-        el->val = nextval;
-        nextval = nextval + myrand(1, step);
-        el->state = HASHSTATE_OUT;
+        e[i].val = n[i];
+        e[i].state = STATE_OUT;
         int j;
         for (j = 0; j < MAX_ACTIONS; ++j)
         {
-            el->actions[j] = myrand(HASHACTION_CON, HASHACTION_DEL);
+            e[i].actions[j] = rand_int_range(ACTION_HAS, ACTION_DEL);
         }
     }
 
     printf("%s\n", "Passed generating random elements to insert");
+
+    hashmap_init(map, sizeof(int), sizeof(int), int_hash_cb, int_eq_cb);
 
     int size = 0;
     int k;
@@ -100,69 +61,91 @@ main(void)
     {
         for (i = 0; i < len; ++i)
         {
-            hashel_t *el = &els[i];
+            entry_t *el = &e[i];
 
             switch (el->actions[k])
             {
-                case HASHACTION_CON:
+                case ACTION_HAS:
                 {
-                    if (HASHSTATE_OUT == el->state)
+                    const void *key = &el->val;
+                    if (STATE_OUT == el->state)
                     {
-                        assert(!hashmap_contains(&map, &el->val) && "Failed contains test");
+                        assert(!hashmap_contains(map, key) && "Failed contains test");
                     }
                     else
                     {
-                        assert(hashmap_contains(&map, &el->val) && "Failed contains test");
+                        assert(hashmap_contains(map, key) && "Failed contains test");
                     }
-                    assert(size == hashmap_size(&map) && "Failed size test");
+                    assert(size == hashmap_size(map) && "Failed size test");
                 }
                 break;
-                case HASHACTION_INS:
+                case ACTION_INS:
                 {
-                    if (HASHSTATE_OUT == el->state)
+                    const void *key = &el->val;
+                    if (STATE_OUT == el->state)
                     {
-                        assert(!hashmap_contains(&map, &el->val) && "Failed contains test");
-                        assert(HASHCODE_OK == hashmap_insert(&map, &el->val, NULL, false) && "Failed insert not exist");
+                        assert(!hashmap_contains(map, key) && "Failed contains test");
+                        assert(HASHCODE_OK == hashmap_insert(map, key, key) && "Failed insert not exist");
                         ++size;
                     }
                     else
                     {
-                        assert(hashmap_contains(&map, &el->val) && "Failed contains test");
-                        assert(HASHCODE_EXIST == hashmap_insert(&map, &el->val, NULL, false) && "Failed insert exists test");
+                        assert(hashmap_contains(map, key) && "Failed contains test");
+                        assert(HASHCODE_EXIST == hashmap_insert(map, key, key) && "Failed insert exists test");
                     }
-                    el->state = HASHSTATE_IN;
-                    assert(size == hashmap_size(&map) && "Failed size test");
-                    assert(hashmap_contains(&map, el) && "Failed contains test");
+                    el->state = STATE_IN;
+                    assert(size == hashmap_size(map) && "Failed size test");
+                    assert(hashmap_contains(map, key) && "Failed contains test");
                 }
                 break;
-                case HASHACTION_DEL:
+                case ACTION_DEL:
                 {
+                    const void *key = &el->val;
                     int out = -1;
-                    if (HASHSTATE_OUT == el->state)
+                    if (STATE_OUT == el->state)
                     {
-                        assert(!hashmap_contains(&map, &el->val) && "Failed contains test");
-                        assert(HASHCODE_NOEXIST == hashmap_remove(&map, &el->val, &out, NULL) && "Failed remove not exist");
+                        assert(!hashmap_contains(map, key) && "Failed contains test");
+                        assert(HASHCODE_NOEXIST == hashmap_remove(map, key, NULL, &out) && "Failed remove not exist");
                         assert(-1 == out && "Failed no modify if not in");
                     }
                     else
                     {
-                        assert(hashmap_contains(&map, &el->val) && "Failed contains test");
-                        assert(HASHCODE_OK == hashmap_remove(&map, &el->val, &out, NULL) && "Failed remove test");
+                        assert(hashmap_contains(map, key) && "Failed contains test");
+                        assert(HASHCODE_OK == hashmap_remove(map, key, NULL, &out) && "Failed remove test");
                         assert(el->val == out && "Failed successful remove");
                         --size;
                     }
-                    el->state = HASHSTATE_OUT;
-                    assert(size == hashmap_size(&map) && "Failed size test");
-                    assert(!hashmap_contains(&map, el) && "Failed contains test");
+                    el->state = STATE_OUT;
+                    assert(size == hashmap_size(map) && "Failed size test");
+                    assert(!hashmap_contains(map, key) && "Failed contains test");
                 }
                 break;
             }
         }
     }
 
-    printf("%s\n", "Passed performing random actions");
+    hashmap_invariant(map);
+    hashmap_print_stats(map);
 
-    hashmap_destroy(&map);
+    hashmap_destroy(map);
+}
+
+int
+main(void)
+{
+    int seed = 0;
+    
+    hashmap_t hmap;
+    hashmap_t *map = &hmap;
+
+    int i;
+    int numtests = 10;
+    for (i = 0; i < numtests; ++i)
+    {
+        runtest(map, (i * 12000) + 1, seed);
+    }
+
+    printf("%s\n", "Passed performing random actions");
 
     return 0;
 }
