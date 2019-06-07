@@ -96,6 +96,7 @@ static const uint8_t SEARCH = 0x40;
 
 /**
  * Max distance before we switch to block searching.
+ * Minimum for this map to work is 15, 16 is pwr of two though ;)
  */
 //static const int LEAPMAX = 1 << 4;
 static const int LEAPMAX = 1 << 6;
@@ -933,31 +934,28 @@ table_cascade(hashmap_t const * const map,
 {
     for (;;)
     {
-        bool scratch;
-        int nnindex = table_leap(map, table, nextslot, headindex, nextindex, &scratch);
-
         // We can change the next's subhash.
         nextslot->hashes[index_sub(nextindex)] = subhash;
-        // Advance the slot pointer.
-        nextslot = table_slot(map, table, index_slot(nnindex));
-        // Get the next mask.
-        uint8_t nnleap = nextslot->leaps[index_sub(nnindex)];
-        nextindex = nnindex;
 
-        if (0 == (LEAP & nnleap))
+        // Get the leap.
+        uint8_t leap = nextslot->leaps[index_sub(nextindex)];
+
+        if (0 == (LEAP & leap))
         {
             // If the next entry is the end, we're done.
             break;
         }
-        if (!(SEARCH & nnleap))
+        if (!(SEARCH & leap))
         {
             // If the next entry isn't a search, we're done.
             break;
         }
-    }
 
-    // Change the next subhash
-    nextslot->hashes[index_sub(nextindex)] = subhash;
+        bool scratch;
+        nextindex = table_leap(map, table, nextslot, headindex, nextindex, &scratch);
+        // Advance the slot pointer.
+        nextslot = table_slot(map, table, index_slot(nextindex));
+    }
 }
 
 /**
