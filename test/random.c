@@ -22,7 +22,7 @@ typedef enum action_e
     ACTION_DEL = 2, // Delete/Remove.
 } action_t;
 
-#define MAX_ACTIONS (2)
+#define MAX_ACTIONS (13)
 
 typedef struct entry_s
 {
@@ -51,12 +51,15 @@ runtest(hashmap_t *map, int len, int forceseed)
         }
     }
 
-    printf("%s\n", "Passed generating random elements to insert");
+    printf("Done generating random elements\n");
 
     hashmap_init(map, sizeof(int), sizeof(int), int_hash_cb, int_eq_cb);
 
     int size = 0;
     int k;
+#ifdef DEBUG
+    bool hasit = false;
+#endif
     for (k = 0; k < MAX_ACTIONS; ++k)
     {
         for (i = 0; i < len; ++i)
@@ -67,6 +70,9 @@ runtest(hashmap_t *map, int len, int forceseed)
             {
                 case ACTION_HAS:
                 {
+#ifdef DEBUG
+                    printf("Has: %d\n", el->val);
+#endif
                     const void *key = &el->val;
                     if (STATE_OUT == el->state)
                     {
@@ -74,6 +80,11 @@ runtest(hashmap_t *map, int len, int forceseed)
                     }
                     else
                     {
+                        if (!hashmap_contains(map, key))
+                        {
+                            printf("Error with val: %d\n", el->val);
+                            fflush(stdout);
+                        }
                         assert(hashmap_contains(map, key) && "Failed contains test");
                     }
                     assert(size == hashmap_size(map) && "Failed size test");
@@ -81,6 +92,9 @@ runtest(hashmap_t *map, int len, int forceseed)
                 break;
                 case ACTION_INS:
                 {
+#ifdef DEBUG
+                    printf("Insert: %d\n", el->val);
+#endif
                     const void *key = &el->val;
                     if (STATE_OUT == el->state)
                     {
@@ -100,6 +114,14 @@ runtest(hashmap_t *map, int len, int forceseed)
                 break;
                 case ACTION_DEL:
                 {
+#ifdef DEBUG
+                    if (528865857 == el->val)
+                    {
+                        hashmap_print(map);
+                        hashmap_invariant(map);
+                    }
+                    printf("Delete: %d\n", el->val);
+#endif
                     const void *key = &el->val;
                     int out = -1;
                     if (STATE_OUT == el->state)
@@ -115,17 +137,41 @@ runtest(hashmap_t *map, int len, int forceseed)
                         assert(el->val == out && "Failed successful remove");
                         --size;
                     }
+#ifdef DEBUG
+                    if (528865857 == el->val)
+                    {
+                        hashmap_print(map);
+                        hashmap_invariant(map);
+                    }
+#endif
                     el->state = STATE_OUT;
                     assert(size == hashmap_size(map) && "Failed size test");
                     assert(!hashmap_contains(map, key) && "Failed contains test");
                 }
                 break;
             }
+
+#ifdef DEBUG
+            if (hasit)
+            {
+                int val = 1845678091;
+                if (!hashmap_contains(map, &val))
+                {
+                    hashmap_print(map);
+                    printf("ERROR HAS OCCURRED\n");
+                    fflush(stdout);
+                    exit(1);
+                }
+            }
+#endif
         }
     }
 
     hashmap_invariant(map);
+
+#ifdef VERBOSE
     hashmap_print_stats(map);
+#endif
 
     hashmap_destroy(map);
 }
@@ -134,6 +180,9 @@ int
 main(void)
 {
     int seed = 0;
+    //seed = 1559935378;
+    //seed = 1559937842;
+    //seed = 1559942970;
     
     hashmap_t hmap;
     hashmap_t *map = &hmap;
@@ -142,7 +191,7 @@ main(void)
     int numtests = 10;
     for (i = 0; i < numtests; ++i)
     {
-        runtest(map, (i * 12000) + 1, seed);
+        runtest(map, 16000, seed);
     }
 
     printf("%s\n", "Passed performing random actions");

@@ -66,7 +66,7 @@ typedef struct hashmap_s
     int                 size;
     int                 tabtype;
     int                 tablen;
-    int                 tabshift;
+    int                 tabmask;
     void               *tables;
     int                 keysize;
     int                 valsize;
