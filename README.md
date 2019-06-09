@@ -7,9 +7,9 @@ C hashmap implementation.
 * [X] Refactor code.
 * [X] Retest.
 * [X] Implement remove.
-* [ ] Implement extended emplace algorithm.
-* [ ] Retest.
-* [ ] Refactor code.
+* [X] Implement extended emplace algorithm.
+* [X] Retest.
+* [X] Refactor code.
 * [ ] Implement grow table split?
 * [ ] Profile.
 
