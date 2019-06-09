@@ -30,7 +30,7 @@ int
 main(void)
 {
     const int max_iter = 1024;
-    const int max_len = 1024;
+    const int max_len = 1024*1024;
 
     int nlen = max_len + max_iter;
     int seed = 0;
@@ -42,7 +42,7 @@ main(void)
     printf("Passed generating random elements to insert\n");
 
     int i;
-    for (i = 0; i < max_len; i = (i + 10))
+    for (i = 1; i < max_len; i = (i * 2))
     {
         struct timespec start;
         struct timespec end;
