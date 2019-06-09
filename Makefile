@@ -51,6 +51,15 @@ ifdef invariant
 DEFINES += -DINVARIANT
 endif
 
+ifdef hashmap
+ifneq ($(strip $(hashmap)),)
+DEFINES += -D$(hashmap)
+endif
+
+else
+DEFINES += -DHASHMAP
+endif
+
 ifdef compiler
 ifneq ($(strip $(compiler)),)
 CC = $(compiler)

@@ -61,3 +61,4 @@ out/
 analysis.txt
 main_coverage.info
 tags
+test/*.hpp

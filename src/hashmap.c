@@ -1577,9 +1577,9 @@ hashmap_destroy(hashmap_t * const map)
         {
             free(map->tables);
         }
-    }
 
-    memset(map, 0, sizeof(hashmap_t));
+        map->tables = NULL;
+    }
 }
 
 /** QUERY FUNCTIONS **/
