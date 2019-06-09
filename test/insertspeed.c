@@ -29,20 +29,22 @@
 int
 main(void)
 {
-    const int max_iter = 1024;
-    const int max_len = 1024*1024;
+    const int max_iter = 1024*2;
+    //const int max_len = 1024*1024;
+    const int max_len = 32000;
 
     int nlen = max_len + max_iter;
     int seed = 0;
-    int forceseed = 0;
+    int forceseed = 482530486;
     int *n = rand_intarr_new(nlen, &seed, forceseed);
 
     printf("SEED: %d\n", seed);
 
     printf("Passed generating random elements to insert\n");
 
-    int i;
-    for (i = 1; i < max_len; i = (i * 2))
+    int i = 32;
+    for (i = 13; i < 8092; i += 1000)
+    //for (i = 1; i < max_len; i = (i * 2))
     {
         struct timespec start;
         struct timespec end;
@@ -121,7 +123,7 @@ main(void)
         double seconds = (double)(end.tv_sec - start.tv_sec) + ((double)end.tv_nsec - (double)start.tv_nsec)/1000000000;
 
         int totallen = i * max_iter;
-        printf("Passed inserting [%d] items in [%f] seconds or [%f per second]\n", totallen, seconds, ((double)totallen/seconds));
+        printf("Passed inserting [%d] items [%d] times in [%f] seconds or [%f per second/%f nsec per op]\n", i, max_iter, seconds, ((double)totallen/seconds), (seconds*1000000000.0)/(double)totallen);
     }
 
     return 0;

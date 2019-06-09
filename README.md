@@ -10,8 +10,10 @@ C hashmap implementation.
 * [X] Implement extended emplace algorithm.
 * [X] Retest.
 * [X] Refactor code.
+* [X] Profile.
 * [ ] Implement grow table split?
 * [ ] Profile.
+* [ ] Add FORCESEED DEFINE.
 
 ## Inspiration
 From descriptions of Google's hashmap and Malte Skarupke's bytell hashmap

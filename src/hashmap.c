@@ -438,7 +438,7 @@ table_slot_len(const table_t *table)
 static inline bool
 table_is_full(const table_t *table)
 {
-    return (table->size > table->load);
+    return (table->size >= table->load);
 }
 
 /**
@@ -571,9 +571,16 @@ map_copy_entry(const hashmap_t *map, table_t *table, int ifrom, int ito)
 {
     slot_t *fslot = map_slot(map, table, index_slot(ifrom));
     slot_t *tslot = map_slot(map, table, index_slot(ito));
+#if 1
     const void *f = map_key(map, fslot, index_sub(ifrom));
     void *t = (void *)map_key(map, tslot, index_sub(ito));
     copydata(t, f, map->elsize);
+#else
+    const char *f = (const char *)map_key(map, fslot, index_sub(ifrom));
+    char *t = (char *)map_key(map, tslot, index_sub(ito));
+    copydata(t, f, map->keysize);
+    copydata(t + map->keysize, f + map->keysize, map->valsize);
+#endif
 }
 
 /******************************************************************************
@@ -623,11 +630,13 @@ table_clear(table_t *table, int slotsize)
     int slen = table_slot_len(table);
     for (i = 0; i < slen; ++i)
     {
-        // TODO test speed
-        // memset(m->hashes, EMPTY, sizeof(m->hashes));
+#if 0
+        memset(m->hashes, EMPTY, sizeof(m->hashes));
+#else
         uint64_t *hashes = (uint64_t *)m->hashes;
         hashes[0] = 0xFFFFFFFFFFFFFFFF;
         hashes[1] = 0xFFFFFFFFFFFFFFFF;
+#endif
         m = (slot_t *)((char *)m + slotsize);
     }
 }
@@ -865,7 +874,7 @@ map_grow(hashmap_t *map, table_t **table, uint32_t hash)
             break;
         case HEMPTY:
             {
-                table_t *newtable = table_new(0, 1, map->slotsize);
+                table_t *newtable = table_new(0, 2, map->slotsize);
                 if (NULL == newtable)
                 {
                     return HASHCODE_NOMEM;
@@ -915,10 +924,16 @@ map_leap_extended(const hashmap_t *map, const table_t *table,
             const void *key = map_key(map, searchslot, subindex);
             uint32_t hash = map_hash(map, key);
             int iheadlanding = table_index(table, hash);
+#if 0
+            // The ilanding check shouldn't be needed.
             int ilanding = index_from(islot, subindex);
-            // TODO the ilanding check shouldn't be needed
             if (ihead == iheadlanding && ilanding != ileap)
             {
+#else
+            if (ihead == iheadlanding)
+            {
+                int ilanding = index_from(islot, subindex);
+#endif
                 return ilanding;
             }
             searchmap = searchmap_clear(searchmap, subindex);

@@ -22,7 +22,7 @@ typedef enum action_e
     ACTION_DEL = 2, // Delete/Remove.
 } action_t;
 
-#define MAX_ACTIONS (13)
+#define MAX_ACTIONS (25)
 
 typedef struct entry_s
 {
@@ -174,6 +174,9 @@ runtest(hashmap_t *map, int len, int forceseed)
 #endif
 
     hashmap_destroy(map);
+
+    rand_intarr_free(n);
+    free(e);
 }
 
 int
