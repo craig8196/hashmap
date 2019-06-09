@@ -11,12 +11,15 @@ C hashmap implementation.
 * [X] Retest.
 * [X] Refactor code.
 * [X] Profile.
-* [ ] Implement grow table split?
+* [ ] Implement grow table split.
+* [ ] Create large test.
 * [ ] Profile.
 * [ ] Add FORCESEED DEFINE.
+* [ ] Optimize resize iteration.
+* [ ] Create speed test for random insert/remove operations.
 
 ## Inspiration
-From descriptions of Google's hashmap and Malte Skarupke's bytell hashmap
+Descriptions of Google's hashmap and Malte Skarupke's bytell hashmap
 found here:
 https://www.youtube.com/watch?v=M2fKMP47slQ
 
@@ -60,11 +63,20 @@ uint32_t newhash = gap_prime * original_hash
 * From other people's experimentation and research there is possibly
   larger cost with calling the equality callback.
   Thus, part of the hash is kept for a quick lint check.
+  Originally I tried storing the full hash, but this is a waste of space.
+  Using 7 bits gives ~1/128 chance of false positive.
 * When hash tables get large they stop being in cache.
   Thus, the dual design of switching to multiple tables when the table
   gets larger.
   This should keep reallocations smaller/granular and increase the speed of the
   table by keeping it in cache longer.
+  So far this doesn't add much, if any, cost.
+* From testing I discovered that with my design the linked list must
+  grow in one direction only.
+  Otherwise you could encounter an infinite loop.
+* This implementation appears to be competitive on the Intel platform.
+  Unfortunately, performance degrades on AMD machines and barely beats
+  std::unordered_map.
 
 ## Implementation and Algorithm
 * A table is power of two number of slots.
@@ -78,7 +90,18 @@ uint32_t newhash = gap_prime * original_hash
 Compute the hash of the key and lookup which table to use.
 
 ### NEXT Algorithm
-TODO
+asdf
+1. If the leap value is direct/local, then add value to index and return
+1. Else the leap value specifies where to start searching:
+    1. Use leap value as the slot index offset
+    1. Compute subhash of hash
+    1. Start LOOP
+        1. Search slot for subhash
+        1. For each hit compute the original head index from the entry's hash
+        1. If the original head index is the same as this list's head index,
+           then return index
+        1. Else increment slot index
+        1. Go to LOOP
 
 ### GET Algorithm
 1. Find slot and entry in slot
@@ -86,10 +109,11 @@ TODO
 1. If entry is NOT head of linked list => done
 1. Compute subhash
 1. Start LOOP
-1. If entry subhash is equal and can trust subhash
-    * If keys are equal => return value
-1. If end of list => done
-1. Go to next entry
+    1. If entry subhash is equal and can trust subhash
+        * If keys are equal => return value
+    1. If end of list => done
+    1. Compute NEXT entry
+    1. Go to LOOP
 
 ### INSERT Algorithm
 TODO
@@ -111,7 +135,7 @@ TODO
 * The number of EMPTY values must equal table length minus the size.
 
 ## Testing
-See `test` directory.
+See `test` directory for available tests.
 
 ## Build Examples
 Build with different optimizations:
@@ -124,13 +148,24 @@ Run test:
 make test target=simple # Name of test file is simple.c
 ```
 
+Run a test with alternate hashmap:
+```bash
+./acquire.sh # Download Malte Skarupke's hashmap variations
+make test target=insertspeed compiler=g++ hashmap=UNORDERED_MAP
+# Possible hashmaps:
+# UNORDERED_MAP
+# UNORDERED_MAP_FIB
+# BYTELL_HASH_MAP
+# FLAT_HASH_MAP
+```
+
 Run a test with profiling and a specific target:
 ```bash
-make test prof=coverage target=speed_insert2 # See out/index.html
+make test prof=coverage target=insertspeed # See out/index.html
 ```
 
 Run with gprof:
 ```bash
-make test prof=gprof target=speed_insert2
+make test prof=gprof target=insertspeed
 ```
 
