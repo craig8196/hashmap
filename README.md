@@ -93,6 +93,7 @@ Compute the hash of the key and lookup which table to use.
 asdf
 1. If the leap value is direct/local, then add value to index and return
 1. Else the leap value specifies where to start searching:
+    1. Set flag indicating subhash of entry cannot be trusted
     1. Use leap value as the slot index offset
     1. Compute subhash of hash
     1. Start LOOP
@@ -104,22 +105,49 @@ asdf
         1. Go to LOOP
 
 ### GET Algorithm
-1. Find slot and entry in slot
-1. If entry is empty => done
-1. If entry is NOT head of linked list => done
+1. Find slot and entry
+1. If EMPTY, return nothing
+1. If LINK, then return nothing
+1. Entry is HEAD
 1. Compute subhash
 1. Start LOOP
     1. If entry subhash is equal and can trust subhash
-        * If keys are equal => return value
-    1. If end of list => done
+        * If keys are equal, then return value
+    1. If end of list, then return nothing
     1. Compute NEXT entry
     1. Go to LOOP
 
 ### INSERT Algorithm
-TODO
+1. Find slot and entry
+1. If EMPTY, place key/val and return
+1. If LINK, move entry to end of its list, place key/val and return
+1. Entry is HEAD
+1. Compute subhash
+1. Start LOOP
+    1. If entry subhash is equal and can trust subhash
+        1. If keys are equal, then return EXIST
+    1. If end of list
+        1. Place key/val and return
+    1. Compute NEXT entry
+    1. Go to LOOP
 
 ### REMOVE Algorithm
-TODO
+1. Find slot and entry
+1. If EMPTY, return NOEXIST
+1. If LINK, return NOEXIST
+1. Entry is HEAD
+1. Compute subhash
+1. Start LOOP
+    1. If entry subhash is equal and can trust subhash
+        1. If keys are equal
+            1. Copy out key and value
+            1. If HEAD
+                1. If HEAD is TAIL, mark as EMPTY and return
+                1. Else unlink and empty next entry and move to HEAD
+            1. Else unlink entry mark as EMPTY and return
+    1. If end of list, return NOEXIST
+    1. Compute NEXT entry
+    1. Go to LOOP
 
 ## Invariants
 * Every item in a linked list must originally index to the head of the list.
