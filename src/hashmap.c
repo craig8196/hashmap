@@ -49,7 +49,7 @@ static const uint64_t FIB = 2654435761;
 #ifdef TEST_HASHMAP_NOSPACE
 static const int HASHMAP_MAX_LEN = 1 << 4;
 #else
-static const int HASHMAP_MAX_LEN = (INT_MAX/2) + 1;
+static const int HASHMAP_MAX_LEN = 1 << 30;
 #endif
 
 /**

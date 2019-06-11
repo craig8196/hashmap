@@ -76,7 +76,7 @@ endif
 ifdef seed
 ifneq ($(strip $(seed)),)
 DEFINES += -DFORCESEED=$(seed)
-else ($(strip $(seed)),)
+else
 DEFINES += -DFORCESEED=0
 endif
 endif
