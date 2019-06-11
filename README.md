@@ -14,7 +14,7 @@ C hashmap implementation.
 * [ ] Implement grow table split.
 * [ ] Create large test.
 * [ ] Profile.
-* [ ] Add FORCESEED DEFINE.
+* [X] Add FORCESEED DEFINE.
 * [ ] Optimize resize iteration.
 * [ ] Create speed test for random insert/remove operations.
 

@@ -58,7 +58,7 @@ dkms.conf
 
 # Generated content
 out/
-analysis.txt
+*.txt
 main_coverage.info
 tags
 test/*.hpp

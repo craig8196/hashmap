@@ -70,6 +70,17 @@ ifdef inline
 CFLAGS += -finline-functions
 endif
 
+ifndef seed
+seed =
+endif
+ifdef seed
+ifneq ($(strip $(seed)),)
+DEFINES += -DFORCESEED=$(seed)
+else ($(strip $(seed)),)
+DEFINES += -DFORCESEED=0
+endif
+endif
+
 SRC = $(wildcard $(SDIR)/*.c)
 OBJS = $(patsubst $(SDIR)/%.c, $(ODIR)/%.o, $(SRC))
 UTILOBJ = $(TDIR)/util.o
@@ -102,6 +113,7 @@ check:
 test: $(OBJS) $(UTILOBJ)
 	$(CC) $(CFLAGS) $(IFLAGS) $(DEFINES) $(LIBS) $^ $(TDIR)/$(TESTFILE).c -o $(TDIR)/$(TESTFILE).o
 	@echo "START TEST: $(TESTFILE)"
+#	@$(TDIR)/$(TESTFILE).o > tmp.txt
 	@$(TDIR)/$(TESTFILE).o && echo "PASSED" || echo "FAILED"
 ifdef prof
 ifeq ($(prof), coverage)

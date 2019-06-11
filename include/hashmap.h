@@ -163,7 +163,7 @@ hashmap_remove(hashmap_t *map, const void *key, void *kout, void *vout);
 /**
  * @brief Check the invariants of the map for debugging.
  */
-void
+hashcode_t
 hashmap_invariant(const hashmap_t *map);
 
 /**

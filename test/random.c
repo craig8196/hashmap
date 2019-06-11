@@ -8,6 +8,10 @@
 #include "hashmap.h"
 #include "util.h"
 
+#ifndef FORCESEED
+#define FORCESEED (0)
+#endif
+
 
 typedef enum state_e
 {
@@ -34,6 +38,7 @@ typedef struct entry_s
 void
 runtest(hashmap_t *map, int len, int forceseed)
 {
+    hashcode_t code = HASHCODE_OK;
     int seed;
     int *n = rand_intarr_new(len, &seed, forceseed);
     entry_t *e = (entry_t *)malloc(sizeof(entry_t) * len);
@@ -92,6 +97,19 @@ runtest(hashmap_t *map, int len, int forceseed)
                 break;
                 case ACTION_INS:
                 {
+#ifdef INVARIANT
+                    if (2135701705 == el->val)
+                    {
+                        code = hashmap_invariant(map);
+                        if (code)
+                        {
+                            printf("Error before insert: %d\n", el->val);
+                            hashmap_print(map);
+                            exit(1);
+                        }
+                        hashmap_print(map);
+                    }
+#endif
 #ifdef DEBUG
                     printf("Insert: %d\n", el->val);
 #endif
@@ -99,7 +117,8 @@ runtest(hashmap_t *map, int len, int forceseed)
                     if (STATE_OUT == el->state)
                     {
                         assert(!hashmap_contains(map, key) && "Failed contains test");
-                        assert(HASHCODE_OK == hashmap_insert(map, key, key) && "Failed insert not exist");
+                        code = hashmap_insert(map, key, key);
+                        assert(HASHCODE_OK == code && "Failed insert not exist");
                         ++size;
                     }
                     else
@@ -107,6 +126,18 @@ runtest(hashmap_t *map, int len, int forceseed)
                         assert(hashmap_contains(map, key) && "Failed contains test");
                         assert(HASHCODE_EXIST == hashmap_insert(map, key, key) && "Failed insert exists test");
                     }
+#ifdef INVARIANT
+                    if (2135701705 == el->val)
+                    {
+                        code = hashmap_invariant(map);
+                        if (code)
+                        {
+                            printf("Error after insert: %d\n", el->val);
+                            hashmap_print(map);
+                            exit(1);
+                        }
+                    }
+#endif
                     el->state = STATE_IN;
                     assert(size == hashmap_size(map) && "Failed size test");
                     assert(hashmap_contains(map, key) && "Failed contains test");
@@ -114,6 +145,18 @@ runtest(hashmap_t *map, int len, int forceseed)
                 break;
                 case ACTION_DEL:
                 {
+#ifdef INVARIANT
+                    if (2135701705 == el->val)
+                    {
+                        code = hashmap_invariant(map);
+                        if (code)
+                        {
+                            printf("Error before remove: %d\n", el->val);
+                            hashmap_print(map);
+                            exit(1);
+                        }
+                    }
+#endif
 #ifdef DEBUG
                     if (528865857 == el->val)
                     {
@@ -137,6 +180,18 @@ runtest(hashmap_t *map, int len, int forceseed)
                         assert(el->val == out && "Failed successful remove");
                         --size;
                     }
+#ifdef INVARIANT
+                    if (2135701705 == el->val)
+                    {
+                        code = hashmap_invariant(map);
+                        if (code)
+                        {
+                            printf("Error after remove: %d\n", el->val);
+                            hashmap_print(map);
+                            exit(1);
+                        }
+                    }
+#endif
 #ifdef DEBUG
                     if (528865857 == el->val)
                     {
@@ -182,10 +237,12 @@ runtest(hashmap_t *map, int len, int forceseed)
 int
 main(void)
 {
-    int seed = 0;
+    int seed = FORCESEED;
+    //Seeds that have led to bugs:
     //seed = 1559935378;
     //seed = 1559937842;
     //seed = 1559942970;
+    //seed = 1560196594;
     
     hashmap_t hmap;
     hashmap_t *map = &hmap;
