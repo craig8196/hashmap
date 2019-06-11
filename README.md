@@ -15,14 +15,13 @@ C hashmap implementation.
 * [ ] Create large test.
 * [ ] Profile.
 * [X] Add FORCESEED DEFINE.
-* [-] Optimize resize iteration. Turns out this may be hard to improve upon.
 * [ ] Create speed test for random insert/remove operations.
 * [X] Add load factor feature.
 * [ ] Revise reserve feature.
 
 ## Inspiration
 Descriptions of Google's hashmap and Malte Skarupke's bytell hashmap
-found here:
+found here:  
 https://www.youtube.com/watch?v=M2fKMP47slQ
 
 ## Design Choices
@@ -92,7 +91,6 @@ uint32_t newhash = gap_prime * original_hash
 Compute the hash of the key and lookup which table to use.
 
 ### NEXT Algorithm
-asdf
 1. If the leap value is direct/local, then add value to index and return
 1. Else the leap value specifies where to start searching:
     1. Set flag indicating subhash of entry cannot be trusted
