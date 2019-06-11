@@ -53,6 +53,8 @@ typedef enum hashcode_e
 }
 hashcode_t;
 
+/** @brief Optional load factor callback. */
+typedef int(*hashmap_load_cb_t)(int maxlen);
 /** @brief Hash callback prototype. */
 typedef uint32_t(*hashmap_hash_cb_t)(const void *key);
 /** @brief Equivalence callback prototype. */
@@ -72,6 +74,7 @@ typedef struct hashmap_s
     int                 valsize;
     int                 elsize;
     int                 slotsize;
+    hashmap_load_cb_t   load_cb;
     hashmap_hash_cb_t   hash_cb;
     hashmap_eq_cb_t     eq_cb;
 }
@@ -85,12 +88,18 @@ hashmap_t;
  * @param eq_cb - Callback to determine key equality.
  * @return HASHCODE_OK on success; HASHCODE_NOMEM if no memory.
  */
-hashcode_t
+void
 hashmap_init(hashmap_t *map,
-             const int keysize,
-             const int valsize,
-             const hashmap_hash_cb_t hash_cb,
-             const hashmap_eq_cb_t eq_cb);
+             int keysize,
+             int valsize,
+             hashmap_hash_cb_t hash_cb,
+             hashmap_eq_cb_t eq_cb);
+
+/**
+ * @brief Set the load factor callback.
+ */
+void
+hashmap_set_load_cb(hashmap_t *map, hashmap_load_cb_t load_cb);
 
 /**
  * @brief Free used resources.

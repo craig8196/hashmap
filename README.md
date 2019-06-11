@@ -17,6 +17,7 @@ C hashmap implementation.
 * [X] Add FORCESEED DEFINE.
 * [ ] Optimize resize iteration.
 * [ ] Create speed test for random insert/remove operations.
+* [X] Add load factor feature.
 
 ## Inspiration
 Descriptions of Google's hashmap and Malte Skarupke's bytell hashmap

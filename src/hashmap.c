@@ -188,6 +188,15 @@ hash_sub(uint32_t hash)
     return ((into[0] ^ into[1] ^ into[2] ^ into[3]) & 0x7F);
 }
 
+/**
+ * @return Load factor.
+ */
+static int
+load_factor_cb(int maxlen)
+{
+    return ((maxlen / SLOTLEN) * (SLOTLEN - 1));
+}
+
 /******************************************************************************
  * INDEX FUNCTIONS
  ******************************************************************************/
@@ -599,18 +608,26 @@ table_clear(table_t *table, int slotsize);
  * @param slotsize - Size of one slot.
  */
 static inline table_t *
-table_new(int index, int nslots, int slotsize)
+table_new(const hashmap_t *map, int index, int nslots)
 {
-    table_t *table = (table_t *)malloc(sizeof(table_t) + (nslots * slotsize));
+    table_t *table = (table_t *)malloc(sizeof(table_t) + (nslots * map->slotsize));
     
     if (NULL != table)
     {
         table->len = nslots * SLOTLEN;
-        table->load = nslots * (SLOTLEN - 1);
+        table->load = map->load_cb(table->len);
+        if (table->load > table->len)
+        {
+            table->load = table->len;
+        }
+        if (table->load < 0)
+        {
+            table->load = table->len / 2;
+        }
         table->elmask = (nslots * SLOTLEN) - 1;
         table->slotmask = nslots - 1;
         table->index = index;
-        table_clear(table, slotsize);
+        table_clear(table, map->slotsize);
     }
 
     return table;
@@ -717,13 +734,13 @@ map_grow_split(hashmap_t * map, table_t *table, int origmapsize, int index,
 {
     table_t **tables = map_tables(map);
 
-    table_t *indextable = table_new(index, nslots_index, map->slotsize);
+    table_t *indextable = table_new(map, index, nslots_index);
     if (NULL == indextable)
     {
         return HASHCODE_NOMEM;
     }
 
-    table_t *peertable = table_new(peer, nslots_peer, map->slotsize);
+    table_t *peertable = table_new(map, peer, nslots_peer);
     if (NULL == peertable)
     {
         free(indextable);
@@ -761,7 +778,7 @@ map_grow_one(hashmap_t *map, table_t **table, int origmapsize)
     }
 
     table_t *oldtable = *table;
-    table_t *newtable = table_new(oldtable->index, slen, map->slotsize);
+    table_t *newtable = table_new(map, oldtable->index, slen);
     if (NULL == newtable)
     {
         return HASHCODE_NOMEM;
@@ -878,7 +895,7 @@ map_grow(hashmap_t *map, table_t **table, uint32_t hash)
             break;
         case HEMPTY:
             {
-                table_t *newtable = table_new(0, 2, map->slotsize);
+                table_t *newtable = table_new(map, 0, 2);
                 if (NULL == newtable)
                 {
                     return HASHCODE_NOMEM;
@@ -1518,12 +1535,12 @@ map_remove(hashmap_t *map, table_t *table,
 
 /** INIT/DESTROY FUNCTIONS **/
 
-hashcode_t
+void
 hashmap_init(hashmap_t * const map,
-             const int keysize,
-             const int valsize,
-             const hashmap_hash_cb_t hash_cb,
-             const hashmap_eq_cb_t eq_cb)
+             int keysize,
+             int valsize,
+             hashmap_hash_cb_t hash_cb,
+             hashmap_eq_cb_t eq_cb)
 {
     map->size = 0;
     map->keysize = keysize;
@@ -1534,10 +1551,15 @@ hashmap_init(hashmap_t * const map,
     map->tablen = 0;
     map->tabmask = 0;
     map->tables = NULL;
+    map->load_cb = load_factor_cb;
     map->hash_cb = hash_cb;
     map->eq_cb = eq_cb;
+}
 
-    return HASHCODE_OK;
+void
+hashmap_set_load_cb(hashmap_t *map, hashmap_load_cb_t load_cb)
+{
+    map->load_cb = load_cb;
 }
 
 void
