@@ -51,11 +51,14 @@ ifdef invariant
 DEFINES += -DINVARIANT
 endif
 
+ifdef reserve
+DEFINES += -DALLOW_RESERVE
+endif
+
 ifdef hashmap
 ifneq ($(strip $(hashmap)),)
 DEFINES += -D$(hashmap)
 endif
-
 else
 DEFINES += -DHASHMAP
 endif

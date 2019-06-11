@@ -633,12 +633,6 @@ table_new(const hashmap_t *map, int index, int nslots)
     return table;
 }
 
-static inline void
-table_free(table_t *table)
-{
-    free(table);
-}
-
 /**
  * @brief Clear all entries in the table.
  */
@@ -704,22 +698,25 @@ map_insert(hashmap_t *map, table_t *table,
 static inline hashcode_t
 map_grow_iter(hashmap_t *map, table_t *table)
 {
-    int sindex;
-    int slen = table_slot_len(table);
-    for (sindex = 0; sindex < slen; ++sindex)
+    if (table->size)
     {
-        slot_t *slot = map_slot(map, table, sindex);
-        int i;
-        for (i = 0; i < SLOTLEN; ++i)
+        int sindex;
+        int slen = table_slot_len(table);
+        for (sindex = 0; sindex < slen; ++sindex)
         {
-            if (EMPTY != slot->hashes[i])
+            slot_t *slot = map_slot(map, table, sindex);
+            int i;
+            for (i = 0; i < SLOTLEN; ++i)
             {
-                const void *key = map_key(map, slot, i);
-                void *val = ((char *)key) + map->keysize;
-                hashcode_t code = hashmap_insert(map, key, val);
-                if (code)
+                if (EMPTY != slot->hashes[i])
                 {
-                    return code;
+                    const void *key = map_key(map, slot, i);
+                    void *val = ((char *)key) + map->keysize;
+                    hashcode_t code = hashmap_insert(map, key, val);
+                    if (code)
+                    {
+                        return code;
+                    }
                 }
             }
         }
@@ -1720,7 +1717,56 @@ hashmap_iterate(hashmap_t const * const map,
 /** MOD FUNCTIONS **/
 
 void
-hashmap_clear(hashmap_t * const map)
+hashmap_reserve(hashmap_t *map, int reserve)
+{
+    // TODO revise this method
+    if (reserve > HASHMAP_MAX_LEN)
+    {
+        reserve = HASHMAP_MAX_LEN;
+    }
+    else if (reserve <= 0)
+    {
+        return;
+    }
+
+    switch (map->tabtype)
+    {
+        case HBIG:
+            {
+                // The point of switching to a bigger table is to 
+                // decrease memory usage.
+                // Also, I'm lazy right now and don't want to implement this.
+            }
+            break;
+        case HSMALL:
+            {
+                int nslot = (reserve % SLOTLEN) ? 1 : 0;
+                nslot += (reserve/SLOTLEN) + 1;
+                table_t *table = (table_t *)map->tables;
+                if (table->load < reserve)
+                {
+                    // Grow the table
+                    map_grow(map, &table, 0);
+                    hashmap_reserve(map, reserve);
+                }
+                else
+                {
+                    // Size adequate, return
+                }
+            }
+            break;
+        case HEMPTY:
+            {
+                table_t *table = NULL;
+                map_grow(map, &table, 0);
+                hashmap_reserve(map, reserve);
+            }
+            break;
+    }
+}
+
+void
+hashmap_clear(hashmap_t *map)
 {
     table_t **tables = NULL;
 

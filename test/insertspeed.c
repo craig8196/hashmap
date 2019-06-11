@@ -63,18 +63,33 @@ main(void)
             bool bval = true;
             hashmap_t map;
             hashmap_init(&map, sizeof(n[0]), sizeof(bool), int_hash_cb, int_eq_cb);
+#ifdef ALLOW_RESERVE
+            hashmap_reserve(&map, i);
+#endif
 #endif
 #ifdef UNORDERED_MAP
             std::unordered_map<int, bool> u;
+#ifdef ALLOW_RESERVE
+            u.reserve(i);
+#endif
 #endif
 #ifdef BYTELL_HASH_MAP
             ska::bytell_hash_map<int, bool> u;
+#ifdef ALLOW_RESERVE
+            u.reserve(i);
+#endif
 #endif
 #ifdef FLAT_HASH_MAP
             ska::flat_hash_map<int, bool> u;
+#ifdef ALLOW_RESERVE
+            u.reserve(i);
+#endif
 #endif
 #ifdef UNORDERED_MAP_FIB
             ska::unordered_map<int, bool> u;
+#ifdef ALLOW_RESERVE
+            u.reserve(i);
+#endif
 #endif
 
             nums = &n[j];

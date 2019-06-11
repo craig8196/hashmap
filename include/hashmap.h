@@ -146,6 +146,12 @@ hashmap_iterate(const hashmap_t *map, void *ud,
                 const hashmap_iterate_cb_t iter_cb);
 
 /**
+ * @brief Grow the table to hold the reserve amount.
+ */
+void
+hashmap_reserve(hashmap_t *map, int reserve);
+
+/**
  * @brief Set all entries and size counts to empty.
  */
 void

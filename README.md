@@ -15,9 +15,10 @@ C hashmap implementation.
 * [ ] Create large test.
 * [ ] Profile.
 * [X] Add FORCESEED DEFINE.
-* [ ] Optimize resize iteration.
+* [-] Optimize resize iteration. Turns out this may be hard to improve upon.
 * [ ] Create speed test for random insert/remove operations.
 * [X] Add load factor feature.
+* [ ] Revise reserve feature.
 
 ## Inspiration
 Descriptions of Google's hashmap and Malte Skarupke's bytell hashmap
@@ -155,11 +156,12 @@ asdf
   This is a test for list membership.
 * Every subhash must match the hash of the associated entry,
   EXCEPT when the entry is found during an extended search
-  (then the entry inherits the subhash from the parent).
+  (then the entry inherits the subhash from the previous entry).
 * Each entry of a linked list must come after the previous entry.
   This guarantees we do NOT have cycles with the extended search option.
 * Linked lists may NOT wrap around the array past the original HEAD.
   This guarantees we do NOT have cycles with the extended search option.
+* The size of the map must equal the sum of the table sizes.
 * The size of the table must equal the sum of the list lengths.
 * The number of EMPTY values must equal table length minus the size.
 
