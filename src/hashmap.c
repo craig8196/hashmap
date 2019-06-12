@@ -260,7 +260,8 @@ index_loc(int start, int end, int test, int len, int mask)
 static inline int
 index_dist(int index1, int index2, int len)
 {
-    return ((index2 < index1) ? (index2 + len) - index1 : index2 - index1);
+    return (index2 - index1) & (len - 1);
+    //return ((index2 < index1) ? (index2 + len) - index1 : index2 - index1);
 }
 
 /******************************************************************************
@@ -1120,24 +1121,33 @@ map_find_empty(const hashmap_t *map, const table_t *table,
     int isub = index_sub(itail);
     int searchmap = slot_find_empty(slottail);
     searchmap = searchmap_limit_after(searchmap, isub);
+    int islot = index_slot(itail);
+
+    if (searchmap)
+    {
+        isub = searchmap_next(searchmap);
+        return index_from(islot, isub);
+    }
 
     int i;
-    int islot = index_slot(itail);
-    for (i = 0; i < table_slot_len(table); ++i)
+    int slotlen = table_slot_len(table);
+    for (i = 1; i < slotlen; ++i)
     {
+        islot = (islot + i) & table_slot_mask(table);
+        slot_t *slot = map_slot(map, table, islot);
+        searchmap = slot_find_empty(slot);
         if (searchmap)
         {
             isub = searchmap_next(searchmap);
             return index_from(islot, isub);
         }
-
-        islot = (islot + 1) & table_slot_mask(table);
-        slot_t *slot = map_slot(map, table, islot);
-        searchmap = slot_find_empty(slot);
     }
 
     // Note that the slot and sindex are already back where we started
     // by this point.
+    islot = (islot + slotlen) & table_slot_mask(table);
+    slot_t *slot = map_slot(map, table, islot);
+    searchmap = slot_find_empty(slot);
     searchmap = searchmap_limit_before(searchmap, isub);
     isub = searchmap_next(searchmap);
     return index_from(islot, isub);
@@ -1218,7 +1228,13 @@ static hashcode_t
 map_emplace(hashmap_t * map, table_t *table, int ihead, int itail,
             uint32_t hash, uint8_t subhash, const void *key, const void *val)
 {
-    if (table_is_full(table))
+    if (!table_is_full(table))
+    {
+        map_place_end(map, table, ihead, itail, subhash, key, val);
+        map_inc(map, table);
+        return HASHCODE_OK;
+    }
+    else
     {
         hashcode_t code = map_grow(map, &table, hash);
         if (code)
@@ -1229,12 +1245,6 @@ map_emplace(hashmap_t * map, table_t *table, int ihead, int itail,
         {
             return map_insert(map, table, hash, key, val);
         }
-    }
-    else
-    {
-        map_place_end(map, table, ihead, itail, subhash, key, val);
-        map_inc(map, table);
-        return HASHCODE_OK;
     }
 }
 
