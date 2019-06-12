@@ -15,7 +15,7 @@ C hashmap implementation.
 * [ ] Create large test.
 * [ ] Profile.
 * [X] Add FORCESEED DEFINE.
-* [ ] Create speed test for random insert/remove operations.
+* [X] Create speed test for random insert/remove operations.
 * [X] Add load factor feature.
 * [ ] Revise reserve feature.
 
@@ -186,6 +186,7 @@ make test target=insertspeed compiler=g++ hashmap=UNORDERED_MAP
 # UNORDERED_MAP_FIB
 # BYTELL_HASH_MAP
 # FLAT_HASH_MAP
+# ROBINHOOD
 ```
 
 Run a test with profiling and a specific target:

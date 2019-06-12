@@ -172,29 +172,19 @@ runtest(entry_t *e, int elen, int maxactions)
 static int
 advance_runlength(int prev, int *counter, int *factor)
 {
-#if 0
     if (0 == ((*counter) % 10))
     {
         (*factor) = (*factor) * 10;
     }
     ++(*counter);
     return prev + (*factor);
-#else
-    *factor = *factor;
-    if ((*counter) / 10)
-    {
-        ++(*counter);
-    }
-    return prev + *counter;
-#endif
-
-
 }
 
 int
 main(void)
 {
     // seed = 1560313389;
+    // seed = 1560374140;
     int seed = FORCESEED;
     int forceseed = FORCESEED;
     const int maxiter = 1024;
@@ -214,8 +204,7 @@ main(void)
         int j;
         for (j = 0; j < MAX_ACTIONS; ++j)
         {
-            //e[i].actions[j] = (action_t)rand_int_range(ACTION_HAS, ACTION_DEL);
-            e[i].actions[j] = (action_t)rand_int_range(ACTION_HAS, ACTION_INS);
+            e[i].actions[j] = (action_t)rand_int_range(ACTION_HAS, ACTION_DEL);
         }
     }
 

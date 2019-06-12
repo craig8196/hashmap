@@ -1133,7 +1133,7 @@ map_find_empty(const hashmap_t *map, const table_t *table,
     int slotlen = table_slot_len(table);
     for (i = 1; i < slotlen; ++i)
     {
-        islot = (islot + i) & table_slot_mask(table);
+        islot = (islot + 1) & table_slot_mask(table);
         slot_t *slot = map_slot(map, table, islot);
         searchmap = slot_find_empty(slot);
         if (searchmap)
@@ -1145,7 +1145,7 @@ map_find_empty(const hashmap_t *map, const table_t *table,
 
     // Note that the slot and sindex are already back where we started
     // by this point.
-    islot = (islot + slotlen) & table_slot_mask(table);
+    islot = (index_slot(itail) + slotlen) & table_slot_mask(table);
     slot_t *slot = map_slot(map, table, islot);
     searchmap = slot_find_empty(slot);
     searchmap = searchmap_limit_before(searchmap, isub);
