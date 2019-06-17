@@ -248,7 +248,7 @@ main(void)
     hashmap_t *map = &hmap;
 
     int i;
-    int numtests = 10;
+    int numtests = 1;
     for (i = 0; i < numtests; ++i)
     {
         runtest(map, 16000, seed);

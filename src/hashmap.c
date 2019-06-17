@@ -34,6 +34,26 @@
 
 
 /******************************************************************************
+ * BEGIN MACROS
+ ******************************************************************************/
+
+#ifdef __GNUC__
+#define LIKELY(x)       __builtin_expect(!!(x), 1)
+#define UNLIKELY(x)     __builtin_expect(!!(x), 0)
+#else
+#define LIKELY(x)       (x)
+#define UNLIKELY(x)     (x)
+#endif
+
+#ifdef __GNUC__
+#define INLINE __attribute__((always_inline))
+#define NOINLINE __attribute__((noinline))
+#else
+#define INLINE 
+#define NOINLINE
+#endif
+
+/******************************************************************************
  * BEGIN GLOBAL CONSTANTS
  ******************************************************************************/
 
@@ -585,16 +605,9 @@ map_copy_entry(const hashmap_t *map, table_t *table, int ifrom, int ito)
 {
     slot_t *fslot = map_slot(map, table, index_slot(ifrom));
     slot_t *tslot = map_slot(map, table, index_slot(ito));
-#if 1
     const void *f = map_key(map, fslot, index_sub(ifrom));
     void *t = (void *)map_key(map, tslot, index_sub(ito));
     copydata(t, f, map->elsize);
-#else
-    const char *f = (const char *)map_key(map, fslot, index_sub(ifrom));
-    char *t = (char *)map_key(map, tslot, index_sub(ito));
-    copydata(t, f, map->keysize);
-    copydata(t + map->keysize, f + map->keysize, map->valsize);
-#endif
 }
 
 /******************************************************************************
@@ -613,7 +626,7 @@ table_new(const hashmap_t *map, int index, int nslots)
 {
     table_t *table = (table_t *)malloc(sizeof(table_t) + (nslots * map->slotsize));
     
-    if (NULL != table)
+    if (LIKELY(NULL != table))
     {
         table->len = nslots * SLOTLEN;
         table->load = map->load_cb(table->len);
@@ -621,7 +634,7 @@ table_new(const hashmap_t *map, int index, int nslots)
         {
             table->load = table->len;
         }
-        if (table->load < 0)
+        if (table->load < (table->len / 2))
         {
             table->load = table->len / 2;
         }
@@ -646,13 +659,9 @@ table_clear(table_t *table, int slotsize)
     int slen = table_slot_len(table);
     for (i = 0; i < slen; ++i)
     {
-#if 0
-        memset(m->hashes, EMPTY, sizeof(m->hashes));
-#else
         uint64_t *hashes = (uint64_t *)m->hashes;
         hashes[0] = 0xFFFFFFFFFFFFFFFF;
         hashes[1] = 0xFFFFFFFFFFFFFFFF;
-#endif
         m = (slot_t *)((char *)m + slotsize);
     }
 }
@@ -667,7 +676,7 @@ table_link(table_t *table, slot_t *slotprev, int iprev, int ilink, uint8_t subha
     int dist = index_dist(iprev, ilink, table_len(table));
     uint8_t newleap = HEAD & slotprev->leaps[index_sub(iprev)];
 
-    if (dist < LEAPMAX)
+    if (LIKELY(dist < LEAPMAX))
     {
         newleap |= dist;
     }
@@ -694,12 +703,15 @@ table_link(table_t *table, slot_t *slotprev, int iprev, int ilink, uint8_t subha
 static inline hashcode_t 
 map_insert(hashmap_t *map, table_t *table,
            uint32_t hash, const void *key, const void *val);
+static inline hashcode_t 
+map_insert_unique(hashmap_t *map, table_t *table,
+                  uint32_t hash, const void *key, const void *val);
 
 /** @brief Iterate over the table and readd to the map. */
 static inline hashcode_t
 map_grow_iter(hashmap_t *map, table_t *table)
 {
-    if (table->size)
+    if (LIKELY(table->size))
     {
         int sindex;
         int slen = table_slot_len(table);
@@ -713,8 +725,8 @@ map_grow_iter(hashmap_t *map, table_t *table)
                 {
                     const void *key = map_key(map, slot, i);
                     void *val = ((char *)key) + map->keysize;
-                    hashcode_t code = hashmap_insert(map, key, val);
-                    if (code)
+                    hashcode_t code = hashmap_insert_unique(map, key, val);
+                    if (UNLIKELY(code))
                     {
                         return code;
                     }
@@ -733,13 +745,13 @@ map_grow_split(hashmap_t * map, table_t *table, int origmapsize, int index,
     table_t **tables = map_tables(map);
 
     table_t *indextable = table_new(map, index, nslots_index);
-    if (NULL == indextable)
+    if (UNLIKELY(NULL == indextable))
     {
         return HASHCODE_NOMEM;
     }
 
     table_t *peertable = table_new(map, peer, nslots_peer);
-    if (NULL == peertable)
+    if (UNLIKELY(NULL == peertable))
     {
         free(indextable);
         return HASHCODE_NOMEM;
@@ -751,7 +763,7 @@ map_grow_split(hashmap_t * map, table_t *table, int origmapsize, int index,
     map->size -= table->size;
     hashcode_t code = map_grow_iter(map, table);
     map->size = origmapsize;
-    if (code)
+    if (UNLIKELY(code))
     {
         tables[index] = table;
         tables[peer] = table;
@@ -770,14 +782,14 @@ static hashcode_t
 map_grow_one(hashmap_t *map, table_t **table, int origmapsize)
 {
     int slen = table_slot_len(*table) * 2;
-    if (slen <= 0)
+    if (UNLIKELY(slen <= 0))
     {
         return HASHCODE_NOSPACE;
     }
 
     table_t *oldtable = *table;
     table_t *newtable = table_new(map, oldtable->index, slen);
-    if (NULL == newtable)
+    if (UNLIKELY(NULL == newtable))
     {
         return HASHCODE_NOMEM;
     }
@@ -787,7 +799,7 @@ map_grow_one(hashmap_t *map, table_t **table, int origmapsize)
     hashcode_t code = map_grow_iter(map, oldtable);
     map->size = origmapsize;
 
-    if (code)
+    if (UNLIKELY(code))
     {
         *table = oldtable;
         free(newtable);
@@ -836,7 +848,7 @@ map_grow_big(hashmap_t *map, table_t **table, uint32_t hash)
     {
         // Increase the size of the current table.
         code = map_grow_one(map, &tables[index], origmapsize);
-        if (!code)
+        if (LIKELY(!code))
         {
             *table = tables[index];
         }
@@ -848,7 +860,7 @@ map_grow_big(hashmap_t *map, table_t **table, uint32_t hash)
 static hashcode_t
 map_grow(hashmap_t *map, table_t **table, uint32_t hash)
 {
-    if (HASHMAP_MAX_LEN <= map->size)
+    if (UNLIKELY(HASHMAP_MAX_LEN <= map->size))
     {
         return HASHCODE_NOSPACE;
     }
@@ -862,12 +874,12 @@ map_grow(hashmap_t *map, table_t **table, uint32_t hash)
             break;
         case HSMALL:
             {
-                if (map->size <= HBIGMIN)
+                if (LIKELY(map->size <= HBIGMIN))
                 {
                     // Just regrow this table.
                     table_t **tableref = (table_t **)(&map->tables);
                     hashcode_t code = map_grow_one(map, tableref, map->size);
-                    if (!code)
+                    if (LIKELY(!code))
                     {
                         *table = (table_t *)map->tables;
                     }
@@ -877,7 +889,7 @@ map_grow(hashmap_t *map, table_t **table, uint32_t hash)
                 {
                     // Upgrade to big hashmap.
                     table_t **tables = (table_t **)malloc(sizeof(table_t *) * 2);
-                    if (NULL == tables)
+                    if (UNLIKELY(NULL == tables))
                     {
                         return HASHCODE_NOMEM;
                     }
@@ -894,7 +906,7 @@ map_grow(hashmap_t *map, table_t **table, uint32_t hash)
         case HEMPTY:
             {
                 table_t *newtable = table_new(map, 0, 2);
-                if (NULL == newtable)
+                if (UNLIKELY(NULL == newtable))
                 {
                     return HASHCODE_NOMEM;
                 }
@@ -915,7 +927,7 @@ map_grow(hashmap_t *map, table_t **table, uint32_t hash)
  * @note Broken out into seperate function in attempt to inline leaps.
  * @return Next index.
  */
-static int
+static int NOINLINE
 map_leap_extended(const hashmap_t *map, const table_t *table,
                   int ihead, int ileap,
                   uint8_t searchhash, uint8_t leap, bool *notrust)
@@ -974,7 +986,7 @@ map_leap(const hashmap_t *map, const table_t *table,
 {
     slot_t *slotleap = map_slot(map, table, index_slot(ileap));
     uint8_t leap = slotleap->leaps[index_sub(ileap)];
-    if (leap_local(leap))
+    if (LIKELY(leap_local(leap)))
     {
         return (ileap + (int)(leap & LEAP)) & table_mask(table);
     }
@@ -1123,7 +1135,7 @@ map_find_empty(const hashmap_t *map, const table_t *table,
     searchmap = searchmap_limit_after(searchmap, isub);
     int islot = index_slot(itail);
 
-    if (searchmap)
+    if (LIKELY(searchmap))
     {
         isub = searchmap_next(searchmap);
         return index_from(islot, isub);
@@ -1166,7 +1178,7 @@ map_place_end(hashmap_t * map, table_t *table, int ihead, int itail,
                              table_len(table), table_mask(table));
 
     uint8_t newleap = 0;
-    if (locempty > 0)
+    if (LIKELY(locempty > 0))
     {
         // Location of empty is after the tail index.
         slot_t *slotempty = map_slot(map, table, index_slot(iempty));
@@ -1228,23 +1240,23 @@ static hashcode_t
 map_emplace(hashmap_t * map, table_t *table, int ihead, int itail,
             uint32_t hash, uint8_t subhash, const void *key, const void *val)
 {
-    if (!table_is_full(table))
-    {
-        map_place_end(map, table, ihead, itail, subhash, key, val);
-        map_inc(map, table);
-        return HASHCODE_OK;
-    }
-    else
+    if (UNLIKELY(table_is_full(table)))
     {
         hashcode_t code = map_grow(map, &table, hash);
-        if (code)
+        if (UNLIKELY(code))
         {
             return code;
         }
         else
         {
-            return map_insert(map, table, hash, key, val);
+            return map_insert_unique(map, table, hash, key, val);
         }
+    }
+    else
+    {
+        map_place_end(map, table, ihead, itail, subhash, key, val);
+        map_inc(map, table);
+        return HASHCODE_OK;
     }
 }
 
@@ -1276,16 +1288,16 @@ static hashcode_t
 map_re_emplace(hashmap_t *map, table_t *table, slot_t *slothead, int ihead,
                uint32_t hash, uint8_t subhash, const void *key, const void *val)
 {
-    if (table_is_full(table))
+    if (UNLIKELY(table_is_full(table)))
     {
         hashcode_t code = map_grow(map, &table, hash);
-        if (code)
+        if (UNLIKELY(code))
         {
             return code;
         }
         else
         {
-            return map_insert(map, table, hash, key, val);
+            return map_insert_unique(map, table, hash, key, val);
         }
     }
     else
@@ -1324,7 +1336,7 @@ map_get(const hashmap_t *map, table_t *table, const void *key, uint32_t hash)
         return NULL;
     }
 
-    if (slot_is_link(slothead, index_sub(ihead)))
+    if (UNLIKELY(slot_is_link(slothead, index_sub(ihead))))
     {
         return NULL;
     }
@@ -1335,7 +1347,7 @@ map_get(const hashmap_t *map, table_t *table, const void *key, uint32_t hash)
     bool notrust = false;
     for (;;)
     {
-        if ((subhash == slot->hashes[index_sub(index)]) || notrust)
+        if (LIKELY((subhash == slot->hashes[index_sub(index)]) || notrust))
         {
             // Maybe already exists.
             const void *key2 = map_key(map, slot, index_sub(index));
@@ -1359,6 +1371,47 @@ map_get(const hashmap_t *map, table_t *table, const void *key, uint32_t hash)
 }
 
 static inline hashcode_t 
+map_insert_unique(hashmap_t *map, table_t *table,
+                  uint32_t hash, const void *key, const void *val)
+{
+    int ihead = table_index(table, hash);
+    slot_t *slothead = map_slot(map, table, index_slot(ihead));
+    uint8_t subhash = hash_sub(hash);
+
+    if (LIKELY(slot_is_empty(slothead, index_sub(ihead))))
+    {
+        // Empty, the optimal case.
+        map_place(map, slothead, index_sub(ihead),  subhash, HEAD, key, val);
+        map_inc(map, table);
+        return HASHCODE_OK;
+    }
+
+    if (UNLIKELY(slot_is_link(slothead, index_sub(ihead))))
+    {
+        // Worst case scenario.
+        // Middle of linked list, relocate.
+        return map_re_emplace(map, table, slothead, ihead, hash, subhash, key, val);
+    }
+
+    int index = ihead;
+    slot_t *slot = slothead;
+    bool notrust = false;
+    for (;;)
+    {
+        if (LIKELY(slot_is_end(slot, index_sub(index))))
+        {
+            return map_emplace(map, table, ihead, index,
+                               hash, subhash, key, val);
+        }
+
+        index = map_leap(map, table, ihead, index, &notrust);
+        slot = map_slot(map, table, index_slot(index));
+    }
+
+    return HASHCODE_ERROR;
+}
+
+static inline hashcode_t 
 map_insert(hashmap_t *map, table_t *table,
            uint32_t hash, const void *key, const void *val)
 {
@@ -1374,7 +1427,7 @@ map_insert(hashmap_t *map, table_t *table,
         return HASHCODE_OK;
     }
 
-    if (slot_is_link(slothead, index_sub(ihead)))
+    if (UNLIKELY(slot_is_link(slothead, index_sub(ihead))))
     {
         // Worst case scenario.
         // Middle of linked list, relocate.
@@ -1386,7 +1439,7 @@ map_insert(hashmap_t *map, table_t *table,
     bool notrust = false;
     for (;;)
     {
-        if ((subhash == slot->hashes[index_sub(index)]) || notrust)
+        if (LIKELY((subhash == slot->hashes[index_sub(index)]) || notrust))
         {
             // Maybe already exists.
             const void *key2 = map_key(map, slot, index_sub(index));
@@ -1417,7 +1470,7 @@ map_insert(hashmap_t *map, table_t *table,
 static inline void
 map_remove_head(hashmap_t *map, table_t *table, slot_t *slothead, int ihead)
 {
-    if (slot_is_end(slothead, index_sub(ihead)))
+    if (LIKELY(slot_is_end(slothead, index_sub(ihead))))
     {
         // Only entry.
         slothead->hashes[index_sub(ihead)] = EMPTY;
@@ -1486,7 +1539,7 @@ map_remove(hashmap_t *map, table_t *table,
         return HASHCODE_NOEXIST;
     }
 
-    if (slot_is_link(slothead, index_sub(ihead)))
+    if (UNLIKELY(slot_is_link(slothead, index_sub(ihead))))
     {
         return HASHCODE_NOEXIST;
     }
@@ -1805,6 +1858,38 @@ hashmap_clear(hashmap_t *map)
         table_clear(table, map->slotsize);
     }
     map->size = 0;
+}
+
+hashcode_t
+hashmap_insert_unique(hashmap_t *map, const void *key, const void *val)
+{
+    table_t *table = NULL;
+    uint32_t hash = hash_fib(map->hash_cb(key));
+
+    switch (map->tabtype)
+    {
+        case HBIG:
+            {
+                table = map_tables(map)[map_choose(map, hash)];
+            }
+            break;
+        case HSMALL:
+            {
+                table = (table_t *)map->tables;
+            }
+            break;
+        case HEMPTY:
+            {
+                hashcode_t code = map_grow(map, &table, hash);
+                if (code)
+                {
+                    return code;
+                }
+            }
+            break;
+    }
+
+    return map_insert_unique(map, table, hash, key, val);
 }
 
 hashcode_t

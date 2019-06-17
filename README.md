@@ -18,11 +18,20 @@ C hashmap implementation.
 * [X] Create speed test for random insert/remove operations.
 * [X] Add load factor feature.
 * [ ] Revise reserve feature.
+* [X] Better branch prediction? LIKELY/UNLIKEY macros optimization. Doesn't do much if anything.
+* [ ] Better re-add on re-size:
+  * This is probably only real optimization left
+  * Each linked-list will be split with decent hash function
+  * If realloc, much work can be prevented by unlinking or moving 50% of entries
+  * If shrinking you can combine entries based on index, rehashing not always needed
+* [X] Abandon C implementation and pursue in C++? Will try on separate branch.
 
 ## Inspiration
 Descriptions of Google's hashmap and Malte Skarupke's bytell hashmap
 found here:  
 https://www.youtube.com/watch?v=M2fKMP47slQ
+Ideas for optimization from Martin Ankerl's hashmap found here:  
+https://github.com/martinus/robin-hood-hashing/
 
 ## Design Choices
 * Fibonacci Hashing for speed.

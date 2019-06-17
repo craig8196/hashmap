@@ -25,6 +25,10 @@
 #include "unordered_map.hpp"
 #endif
 
+#ifdef ROBINHOOD
+#include "robin_hood.hpp"
+#endif
+
 
 int
 main(void)
@@ -91,6 +95,12 @@ main(void)
             u.reserve(i);
 #endif
 #endif
+#ifdef ROBINHOOD
+            robin_hood::unordered_map<int, bool> u;
+#ifdef ALLOW_RESERVE
+            u.reserve(i);
+#endif
+#endif
 
             nums = &n[j];
             int k;
@@ -99,33 +109,12 @@ main(void)
 #ifdef HASHMAP
                 hashmap_insert(&map, &nums[k], &bval);
 #endif
-#ifdef UNORDERED_MAP
-                u.insert({ nums[k], true });
-#endif
-#ifdef BYTELL_HASH_MAP
-                u.insert({ nums[k], true });
-#endif
-#ifdef FLAT_HASH_MAP
-                u.insert({ nums[k], true });
-#endif
-#ifdef UNORDERED_MAP_FIB
+#if defined UNORDERED_MAP || defined BYTELL_HASH_MAP || defined FLAT_HASH_MAP || defined UNORDERED_MAP_FIB || defined ROBINHOOD
                 u.insert({ nums[k], true });
 #endif
             }
 #ifdef HASHMAP
             hashmap_destroy(&map);
-#endif
-#ifdef UNORDERED_MAP
-            // Auto cleanup
-#endif
-#ifdef BYTELL_HASH_MAP
-            // Auto cleanup
-#endif
-#ifdef FLAT_HASH_MAP
-            // Auto cleanup
-#endif
-#ifdef UNORDERED_MAP_FIB
-            // Auto cleanup
 #endif
         }
 

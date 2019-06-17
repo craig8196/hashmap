@@ -159,6 +159,15 @@ hashmap_clear(hashmap_t *map);
 
 /**
  * @brief Insert the key/val into the hashtable.
+ * @warn The key MUST be unique.
+ * @return HASHCODE_OK on success;
+ *         HASHCODE_NOSPACE, HASHCODE_EXIST, HASHCODE_NOMEM otherwise.
+ */
+hashcode_t
+hashmap_insert_unique(hashmap_t *map, const void *key, const void *val);
+
+/**
+ * @brief Insert the key/val into the hashtable.
  * @return HASHCODE_OK on success;
  *         HASHCODE_NOSPACE, HASHCODE_EXIST, HASHCODE_NOMEM otherwise.
  */

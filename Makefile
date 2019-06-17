@@ -51,6 +51,10 @@ ifdef invariant
 DEFINES += -DINVARIANT
 endif
 
+ifdef verbose
+DEFINES += -DVERBOSE
+endif
+
 ifdef reserve
 DEFINES += -DALLOW_RESERVE
 endif
@@ -114,7 +118,7 @@ check:
 
 .PHONY: doc
 doc:
-	doxygen
+	doxygen Doxyfile
 
 .PHONY: test
 test: $(OBJS) $(UTILOBJ)
