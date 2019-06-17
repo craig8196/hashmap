@@ -57,6 +57,7 @@ Mkfile.old
 dkms.conf
 
 # Generated content
+doc/
 out/
 *.txt
 main_coverage.info

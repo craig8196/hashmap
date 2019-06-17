@@ -112,6 +112,10 @@ check:
 	scan-build make
 	@echo "END CLANG/SCAN-BUILD"
 
+.PHONY: doc
+doc:
+	doxygen
+
 .PHONY: test
 test: $(OBJS) $(UTILOBJ)
 	$(CC) $(CFLAGS) $(IFLAGS) $(DEFINES) $(LIBS) $^ $(TDIR)/$(TESTFILE).c -o $(TDIR)/$(TESTFILE).o
