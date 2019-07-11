@@ -73,6 +73,12 @@ CC = $(compiler)
 endif
 endif
 
+ifeq ($(strip $(CC)),gcc)
+EXT = c
+else
+EXT = cpp
+endif
+
 ifdef inline
 CFLAGS += -finline-functions
 endif
@@ -122,7 +128,7 @@ doc:
 
 .PHONY: test
 test: $(OBJS) $(UTILOBJ)
-	$(CC) $(CFLAGS) $(IFLAGS) $(DEFINES) $(LIBS) $^ $(TDIR)/$(TESTFILE).c -o $(TDIR)/$(TESTFILE).o
+	$(CC) $(CFLAGS) $(IFLAGS) $(DEFINES) $(LIBS) $^ $(TDIR)/$(TESTFILE).$(EXT) -o $(TDIR)/$(TESTFILE).o
 	@echo "START TEST: $(TESTFILE)"
 #	@$(TDIR)/$(TESTFILE).o > tmp.txt
 	@$(TDIR)/$(TESTFILE).o && echo "PASSED" || echo "FAILED"
@@ -139,5 +145,5 @@ endif
 
 .PHONY: clean
 clean:
-	@rm -rf $(ODIR) $(LDIR) $(TDIR)/*.o out/ gmon.out *.info *.gcda *.gcno && echo "CLEANED!" || echo "FAILED TO CLEANUP!"
+	@rm -rf $(ODIR) $(LDIR) $(TDIR)/*.o out/ gmon.out *.txt *.info *.gcda *.gcno && echo "CLEANED!" || echo "FAILED TO CLEANUP!"
 

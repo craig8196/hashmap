@@ -1,27 +1,89 @@
 
+#include <string>
 #include <assert.h>
 #include <stdio.h>
-#include <string.h>
+#include <iostream>
 
-#include "hashmap.h"
 #include "util.h"
 
+#include "hackmap.hpp"
+
+
+using namespace std;
+
+namespace abc
+{
+    class myhash
+    {
+    public:
+        size_t
+        operator()(const int& k) const
+        {
+            return k * 3;
+        }
+    };
+}
+
+using map_type = crj::unordered_map<int, bool>;
 
 int
 main(void)
 {
-    hashmap_t hmap;
-    hashmap_t *map = &hmap;
 
     {
-        // Simple empty tests.
-        // Test that we can initialize the hashmap.
-        hashmap_init(map, sizeof(int), 0, int_hash_cb, int_eq_cb);
-        assert(hashmap_empty(map) && "Failed empty");
-        assert(0 == hashmap_size(map) && "Failed zero");
-        hashmap_destroy(map);
+        // Simple initialize/empty test.
+        map_type map;
+
+        assert(map.empty() && "Fail: empty");
+        assert(0 == map.size() && "Fail: size 0");
+        assert(map.find(3) == map.end() && "Fail: find !exist");
+
+        cout << "PASSED INITIALIZE/EMPTY\n";
     }
 
+    {
+        // Simple insert and find test.
+        // Test that we can initialize the hashmap.
+
+        map_type map;
+
+        size_t count = map.erase(3);
+        assert(0 == count && "Fail: map is empty");
+        assert(map.size() == 0 && "Fail: map size not 0");
+
+        auto result = map.insert({3, true});
+        assert(result.second && "Fail: insert new");
+
+        auto insert_iterator = result.first;
+        result = map.insert({3, false});
+        assert(!result.second && "Fail: insert exist");
+
+        auto find_iterator = map.find(3);
+        assert(find_iterator == insert_iterator && "Fail: find value");
+        assert(find_iterator->second && "Fail: value check");
+
+        auto emplace_result = map.emplace(3, false);
+        assert(!emplace_result.second && "Fail: emplace exist");
+
+        auto emplace_iterator = emplace_result.first;
+        assert(emplace_iterator != map.end() && "Fail: emplace");
+
+        find_iterator = map.find(3);
+        assert(!find_iterator->second && "Fail: value update");
+        assert(map.size() == 1 && "Fail: map size");
+
+        count = map.erase(4);
+        assert(0 == count && "Fail: should not erase anything");
+        assert(map.size() == 1 && "Fail: map size changed");
+
+        count = map.erase(3);
+        assert(1 == count && "Fail: should erase");
+        assert(map.size() == 0 && "Fail: map size not 0");
+
+        cout << "PASSED SIMPLE INSERT/EMPLACE/FIND/ERASE\n";
+    }
+
+#if 0
     {
         // Simple insert one test.
         // Test that we can insert into empty cell.
@@ -168,6 +230,7 @@ main(void)
 
         rand_intarr_free(n);
     }
+#endif
 
     return 0;
 }

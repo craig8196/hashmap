@@ -56,7 +56,7 @@ int_sort(int * arr, const int len)
 int *
 rand_intarr_new(const int len, int *seedout, int forceseed)
 {
-    int *arr = malloc(sizeof(int) * len);
+    int *arr = (int *)malloc(sizeof(int) * len);
 
     if (arr)
     {

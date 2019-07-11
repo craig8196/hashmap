@@ -3,28 +3,9 @@
 C hashmap implementation.
 
 ## TODO
-* [X] Implement insert, get.
-* [X] Refactor code.
-* [X] Retest.
-* [X] Implement remove.
-* [X] Implement extended emplace algorithm.
-* [X] Retest.
-* [X] Refactor code.
-* [X] Profile.
-* [ ] Implement grow table split.
-* [ ] Create large test.
-* [ ] Profile.
-* [X] Add FORCESEED DEFINE.
-* [X] Create speed test for random insert/remove operations.
-* [X] Add load factor feature.
-* [ ] Revise reserve feature.
-* [X] Better branch prediction? LIKELY/UNLIKEY macros optimization. Doesn't do much if anything.
-* [ ] Better re-add on re-size:
-  * This is probably only real optimization left
-  * Each linked-list will be split with decent hash function
-  * If realloc, much work can be prevented by unlinking or moving 50% of entries
-  * If shrinking you can combine entries based on index, rehashing not always needed
-* [X] Abandon C implementation and pursue in C++? Will try on separate branch.
+* [ ] Rewrite in C++
+* [ ] Write tests
+* [ ] Pass all tests
 
 ## Inspiration
 Descriptions of Google's hashmap and Malte Skarupke's bytell hashmap
@@ -34,7 +15,7 @@ Ideas for optimization from Martin Ankerl's hashmap found here:
 https://github.com/martinus/robin-hood-hashing/
 
 ## Design Choices
-* Fibonacci Hashing for speed.
+* Fibonacci Hashing for speed and to mitigate power of 2 sizing.
 * Power of 2 sized tables for ease of growth and modulo.
 * Internally will be a table until a fixed point, then a table of tables.
 * Open addressing with chaining.
@@ -191,6 +172,7 @@ Run a test with alternate hashmap:
 ./acquire.sh # Download Malte Skarupke's hashmap variations
 make test target=insertspeed compiler=g++ hashmap=UNORDERED_MAP
 # Possible hashmaps:
+# HASHMAP (default)
 # UNORDERED_MAP
 # UNORDERED_MAP_FIB
 # BYTELL_HASH_MAP
