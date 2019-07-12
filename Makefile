@@ -10,7 +10,7 @@ ODIR = ./obj
 LDIR = ./lib
 
 AR = ar
-CC = gcc
+CC = g++
 CFLAGS = -Wall -Wextra -Werror -pedantic -msse2 -g $(DEBUG) $(OPS) $(PROF)
 IFLAGS = -I$(IDIR)
 LIBS =

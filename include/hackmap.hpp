@@ -32,7 +32,9 @@
 #include <cstring>
 #include <functional>
 #include <iostream>
+#include <iomanip>
 #include <limits>
+#include <vector>
 
 #include <emmintrin.h>
 
@@ -67,18 +69,26 @@ namespace crj
 {
 using size_type = std::size_t;
 
-template <typename Key, typename Hash = std::hash<Key>>
-struct FibonacciHash: public Hash
+class unordered_map_stats
 {
-    FibonacciHash(const Hash& h = Hash{}) : Hash(h) {}
+public:
+    std::vector<size_type> distances;
+    size_type extended_leaps;
+
+    unordered_map_stats() = default;
+};
+
+template <typename Key, typename Hash = std::hash<Key>>
+struct fibonacci_hash: public Hash
+{
+    fibonacci_hash(const Hash& h = Hash{}) : Hash(h) {}
 #pragma message (SIZE_MAX)
 #if HASH_SIZE == 32
     /*
      * (2**32)/(Golden Ratio) ~= 2654435769
      * The two closest primes are 2654435761 and 2654435789
      */
-    static constexpr size_type FIB = size_type(2654435761);
-    static constexpr int SHIFT = 16;
+    static constexpr size_type FIB = size_type(2654435761UL);
 #elif HASH_SIZE == 64
     /*
      * (2**64)/(Golden Ratio) ~= 11400714819323198486
@@ -86,10 +96,10 @@ struct FibonacciHash: public Hash
      * 11400714819323198487
      */
     static constexpr size_type FIB = size_type(11400714819323198487ULL);
-    static constexpr int SHIFT = 32;
 #else
     // Error already reported above.
 #endif
+    static constexpr int SHIFT = (sizeof(size_type) * 8) / 2;
 
     size_type
     operator()(const Key& k)
@@ -104,37 +114,34 @@ namespace detail
 {
 
 static constexpr int BLOCK_LEN = int(16);
-static constexpr int LEAP_MAX = 1 << 6;
-static constexpr int SEARCH_MASK = 0x0000FFFF;
-static constexpr int HASH_BITS = 6;
-
 
 struct BlockFull {};
+struct IteratorLeap{};
 
-class SearchMap
+class search_map
 {
 public:
-    SearchMap(int map)
+    search_map(int map)
         : mMap(map)
     {}
 
-    SearchMap(SearchMap& m)
+    search_map(search_map& m)
         : mMap(m.mMap)
     {}
 
-    SearchMap(SearchMap&& m)
+    search_map(search_map&& m)
         : mMap(m.mMap)
     {}
 
-    SearchMap&
-    operator=(SearchMap& m)
+    search_map&
+    operator=(search_map& m)
     {
         mMap = m.mMap;
         return *this;
     }
 
-    SearchMap&
-    operator=(SearchMap&& m)
+    search_map&
+    operator=(search_map&& m)
     {
         mMap = m.mMap;
         return *this;
@@ -197,8 +204,10 @@ private:
     Value   mValue[BLOCK_LEN];
 
     /* Hash related */
+    static constexpr uint8_t SPECIAL   = uint8_t(0x80);
     static constexpr uint8_t EMPTY     = uint8_t(0xFF);
     static constexpr uint8_t NOFIND    = uint8_t(0xFE);
+    static constexpr uint8_t SENTINEL  = uint8_t(0xFD);
     static constexpr uint8_t LINK      = uint8_t(0x40);
     static constexpr uint8_t HASH_MASK = uint8_t(0x3F);
     /* Link related */
@@ -222,8 +231,16 @@ public:
     { return d < size_type(FIND); }
 
     static void
-    set_empty_all(unsigned char *p, size_type len)
+    fill_empty(unsigned char *p, size_type len)
     { std::memset(p, EMPTY, len); }
+
+    static void
+    fill_sentinel(unsigned char *p)
+    { std::memset(p, SENTINEL, BLOCK_LEN); }
+
+    static size_type
+    sentinel_memory_size()
+    { return BLOCK_LEN; }
 
     static size_type
     construct_index(size_type i, int sub)
@@ -321,7 +338,7 @@ public:
     noexcept
     { return mValue + (i % BLOCK_LEN); }
 
-    SearchMap
+    search_map
     find(uint8_t h)
     const noexcept
     {
@@ -348,33 +365,62 @@ public:
 #endif
     }
 
-    SearchMap
+    search_map
     find_empty(size_type i)
     const noexcept
     {
         return { find_empty().value() & ~((1 << (i % BLOCK_LEN)) - 1) };
     }
 
-    SearchMap
+    search_map
     find_empty()
     const noexcept
     {
         return { find(EMPTY) };
     }
 
-    SearchMap
+    search_map
     find_full(size_type i)
     const noexcept
     {
         return { find_full().value() & ~((1 << (i % BLOCK_LEN)) - 1) };
     }
 
-    SearchMap
+    search_map
     find_full()
     const noexcept
     {
         return { ~find(EMPTY).value() & ((1 << BLOCK_LEN) - 1) };
     }
+
+    bool
+    is_empty_by_subindex(int i)
+    const noexcept
+    { return mHash[i] == EMPTY; }
+
+    bool
+    is_head_by_subindex(int i)
+    const noexcept
+    { return !(mHash[i] & LINK); }
+
+    bool
+    is_special_by_subindex(int i)
+    { return mHash[i] & SPECIAL; }
+
+
+    uint8_t
+    get_hash_by_subindex(int i)
+    const noexcept
+    { return mHash[i]; }
+
+    uint8_t
+    get_leap_by_subindex(int i)
+    const noexcept
+    { return mLeap[i]; }
+
+    Value&
+    get_value_by_subindex(int i)
+    { return mValue[i]; }
 };
 
 static Block<uint8_t> NULL_BLOCK(BlockFull{});
@@ -382,9 +428,9 @@ static Block<uint8_t> NULL_BLOCK(BlockFull{});
 template <int MaxLoadFactor,
           typename Key,
           typename T,
-          typename Hash,
-          typename Pred,
-          typename Alloc
+          typename Hash = fibonacci_hash<Key>,
+          typename Pred = std::equal_to<Key>,
+          typename Alloc = std::allocator<unsigned char>
           >
 class unordered_map: public Hash, public Pred, public Alloc
 {
@@ -434,6 +480,13 @@ public:
         Iterator(block_type* blockPointer, size_type index)
             : mBlock(blockPointer), mIndex(index)
         {}
+
+        Iterator(block_type* blockPointer, size_type index,
+                 IteratorLeap UNUSED(unused))
+            : mBlock(blockPointer), mIndex(index)
+        {
+            leap_if_empty();
+        }
 
         template <bool OtherIsConstant,
                   typename = typename std::enable_if<IsConstant && !OtherIsConstant>::type>
@@ -505,7 +558,7 @@ public:
             auto block = block_type::get(mBlock, mIndex);
             if (block->is_empty(mIndex))
             {
-                SearchMap map = block->find_full(mIndex);
+                search_map map = block->find_full(mIndex);
                 while (!map.has())
                 {
                     mIndex += 16;
@@ -674,7 +727,7 @@ public:
     begin()
     noexcept
     {
-        return iterator{ mBlock, 0 };
+        return iterator{ mBlock, 0, IteratorLeap{} };
     }
 
     const_iterator
@@ -695,7 +748,7 @@ public:
     bucket_count()
     const noexcept
     {
-        return size();
+        return mLen;
     }
 
     size_type
@@ -710,7 +763,7 @@ public:
     cbegin()
     const noexcept
     {
-        return const_iterator{ mBlock, 0 };
+        return const_iterator{ mBlock, 0, IteratorLeap{} };
     }
 
     const_iterator
@@ -782,7 +835,8 @@ public:
         size_type index = find_index(k);
         if (index != mLen)
         {
-            return { iterator{ mBlock, index }, iterator{ mBlock, index + 1}};
+            return { iterator{ mBlock, index },
+                     iterator{ mBlock, index + 1, IteratorLeap{} } };
         }
         else
         {
@@ -797,7 +851,8 @@ public:
         size_type index = find_index(k);
         if (index != mLen)
         {
-            return { const_iterator{ mBlock, index }, const_iterator{ mBlock, index + 1}};
+            return { const_iterator{ mBlock, index },
+                     const_iterator{ mBlock, index + 1, IteratorLeap{} } };
         }
         else
         {
@@ -809,7 +864,7 @@ public:
     erase(const_iterator position)
     {
         erase((*position).first);
-        return iterator{ position.mBlock, position.mIndex + 1 };
+        return iterator{ position.mBlock, position.mIndex + 1, IteratorLeap{} };
     }
 
     size_type
@@ -1081,7 +1136,7 @@ public:
             return false;
         }
 
-        iterator start{ mBlock, 0 };
+        iterator start{ mBlock, 0, IteratorLeap{} };
         const_iterator stop = cend();
 
         while (start != stop)
@@ -1170,6 +1225,214 @@ public:
         std::swap(*this, o);
     }
 
+    bool
+    invariant_head(std::ostream* os,
+                   size_type& size_lists,
+                   block_type* block,
+                   size_type ihead)
+    const noexcept
+    {
+        size_type index = ihead;
+
+        size_type i = 0;
+        for (; i < mLen; ++i)
+        {
+            ++size_lists;
+            if (index != ihead)
+            {
+                if (block->is_head(index))
+                {
+                    if (nullptr != os)
+                    {
+                        (*os) << "Link leaped to is flagged as head: "
+                              << index << std::endl;
+                    }
+                    return false;
+                }
+            }
+            else
+            {
+                if (block->is_link(index))
+                {
+                    if (nullptr != os)
+                    {
+                        (*os) << "Head index is flagged as link: "
+                              << index << std::endl;
+                    }
+                    return false;
+                }
+            }
+
+            size_type myhead = key_to_index(block->get_value(index).first);
+            if (myhead != ihead)
+            {
+                if (nullptr != os)
+                {
+                    (*os) << "Link leaped to [" << index
+                          << "] not part of list at [" << ihead
+                          << "] head index reported as [" << myhead
+                          << "]" << std::endl;
+                }
+                return false;
+            }
+
+            if (block->is_end(index))
+            {
+                break;
+            }
+
+            bool notrust = false;
+            index = leap(ihead, index, notrust);
+            block = get_block(index);
+        }
+
+        if (i == mLen)
+        {
+            if (nullptr != os)
+            {
+                (*os) << "Too many leaps starting at: "
+                      << ihead << std::endl;
+            }
+            return false;
+        }
+
+        return true;
+    }
+
+    bool
+    invariant()
+    const noexcept
+    {
+        return invariant(nullptr);
+    }
+
+    bool
+    invariant(std::ostream* os)
+    const noexcept
+    {
+        size_type size_count = 0;
+        size_type size_lists = 0;
+
+        size_type index = 0;
+        while (index < mLen)
+        {
+            auto block = get_block(index);
+            for (int sub = 0; sub < BLOCK_LEN; ++sub)
+            {
+                if (block->is_empty_by_subindex(sub))
+                {
+                    continue;
+                }
+
+                if (block->is_special_by_subindex(sub))
+                {
+                    if (nullptr != os)
+                    {
+                        (*os) << "Special hash value at: "
+                              << combine_index(index, sub) << std::endl;
+                    }
+                    return false;
+                }
+
+                if (block->is_head_by_subindex(sub))
+                {
+                    bool pass = invariant_head(os, size_lists, block,
+                                               combine_index(index, sub));
+                    if (!pass)
+                    {
+                        if (nullptr != os)
+                        {
+                            (*os) << "Invalid linked list at: "
+                                  << combine_index(index, sub) << std::endl;
+                        }
+                        return false;
+                    }
+                }
+
+                ++size_count;
+            }
+            index += BLOCK_LEN;
+        }
+
+        if (size_count != size())
+        {
+            if (nullptr != os)
+            {
+                (*os) << "Invalid size by counting full entries" << std::endl;
+            }
+            return false;
+        }
+
+        if (size_lists != size())
+        {
+            if (nullptr != os)
+            {
+                (*os) << "Invalid size by counting lists" << std::endl;
+            }
+            return false;
+        }
+
+        return true;
+    }
+
+    void
+    print_block(std::ostream& os, size_type index)
+    const
+    {
+        auto block = get_block(index);
+        for (int i = 0; i < BLOCK_LEN; ++i)
+        {
+            std::ios_base::fmtflags flags = os.flags();
+            uint8_t hash = block->get_hash_by_subindex(i);
+            uint8_t leap = block->get_leap_by_subindex(i);
+            os << "0x";
+            os << std::setfill('0') << std::setw(2) << std::hex
+               << std::uppercase
+               << unsigned(hash);
+            os.flags(flags);
+            os << " 0x";
+            os << std::setfill('0') << std::setw(2) << std::hex
+               << std::uppercase
+               << unsigned(leap);
+            os.flags(flags);
+            if (!block->is_empty_by_subindex(i))
+            {
+                auto ref = block->get_value_by_subindex(i);
+                os << ": ";
+                os << ref.first << ' ' << ref.second;
+            }
+            os << std::endl;
+        }
+    }
+
+    void
+    print()
+    const
+    {
+        print(std::cout);
+    }
+
+    void
+    print(std::ostream& os)
+    const
+    {
+        if (mSize)
+        {
+            os << "TABLE START" << std::endl;
+            size_type index = 0;
+            while (index < mLen)
+            {
+                print_block(os, index);
+                index = index + BLOCK_LEN;
+            }
+            os << "TABLE END" << std::endl;
+        }
+        else
+        {
+            os << "TABLE EMPTY" << std::endl;
+        }
+    }
+
 private:
     template <typename FindKey>
     size_type
@@ -1185,27 +1448,27 @@ private:
             return mLen;
         }
 
+        uint8_t frag = hash_fragment(hash);
+
+        if (frag == block->get_hash(ihead))
+        {
+            if (compare_keys(block->get_value(ihead).first, k))
+            {
+                return ihead;
+            }
+        }
+
         if (UNLIKELY(block->is_link(ihead)))
         {
             return mLen;
         }
 
-        uint8_t frag = hash_fragment(hash);
-        size_type index = ihead;
-
-        if (frag == block->get_hash(index))
-        {
-            if (compare_keys(block->get_value(index).first, k))
-            {
-                return index;
-            }
-        }
-
-        if (block->is_end(index))
+        if (block->is_end(ihead))
         {
             return mLen;
         }
-
+        
+        size_type index = ihead;
         frag = block_type::set_link_hash(frag);
         for (;;)
         {
@@ -1315,7 +1578,6 @@ private:
         {
             size_type ihead = hash_to_index(hash);
             auto block = get_block(ihead);
-            uint8_t newleap = 0;
             size_type index = ihead;
 
             if (IsListInsert || block->is_full(ihead))
@@ -1333,7 +1595,9 @@ private:
                 {
                     unlink_link_at(ihead);
                     block->flag_unsearchable(ihead);
+                    --mSize;
                     upsert<true, true, true>(std::move(block->get_value(ihead)));
+                    block->set_end(ihead);
                 }
                 else
                 {
@@ -1353,12 +1617,13 @@ private:
                             }
                         }
 
+                        frag = block_type::set_link_hash(frag);
+
                         if (block->is_end(index))
                         {
                             break;
                         }
 
-                        frag = block_type::set_link_hash(frag);
                         for (;;)
                         {
                             bool notrust = false;
@@ -1393,9 +1658,12 @@ private:
                     block = get_block(index);
                 }
             }
+            else
+            {
+                block->set_end(index);
+            }
 
             block->set_hash(index, frag);
-            block->set_leap(index, newleap);
             ::new (block->get_value_ptr(index)) value_type(std::forward<UpsertKey>(k), std::forward<Args>(args)...);
             ++mSize;
             return std::make_pair<iterator, bool>({mBlock, index}, true);
@@ -1409,7 +1677,7 @@ private:
         auto block = get_block(itail);
         int isub;
 
-        SearchMap map = block->find_empty(itail);
+        search_map map = block->find_empty(itail);
         if (LIKELY(map.has()))
         {
             isub = map.next();
@@ -1431,7 +1699,7 @@ private:
     }
 
     size_type
-    link_empty(size_type ihead, size_type itail, uint8_t& shash)
+    link_empty(size_type ihead, size_type itail, uint8_t& frag)
     noexcept
     {
         size_type iempty = find_empty(itail);
@@ -1440,7 +1708,8 @@ private:
 
         if (LIKELY(emptyPos > nextPos))
         {
-            link(itail, iempty, shash);
+            link(itail, iempty, frag);
+            get_block(iempty)->set_end(iempty);
         }
         else
         {
@@ -1465,15 +1734,16 @@ private:
             auto next = get_block(inext);
 
             // Link previous to empty slot.
-            link(iprev, iempty, shash);
+            link(iprev, iempty, frag);
             // Set the empty slot.
-            empty->set_hash(iempty, shash);
+            empty->set_hash(iempty, frag);
             // Generate hash of next and link empty to next.
             size_type hash = hash_key(next->get_value(inext).first);
             uint8_t subhashnext = hash_fragment(hash);
+            subhashnext = block_type::set_link_hash(subhashnext);
             link(iempty, inext, subhashnext);
             // Check if we need to cascade hashes.
-            if (!next->is_local(inext))
+            if (UNLIKELY(!next->is_local(inext)))
             {
                 bool scrap;
                 size_type inextnext = leap(ihead, inext, scrap);
@@ -1499,7 +1769,7 @@ private:
         }
         else
         {
-            shash = block->get_hash(iprev);
+            shash = block_type::set_link_hash(block->get_hash(iprev));
             block->set_find(iprev);
         }
     }
@@ -1740,12 +2010,12 @@ private:
 
     INLINE
     size_type
-    leap(size_type ihead, size_type index, bool& notrust)
+    leap(size_type ihead, size_type ifrom, bool& notrust)
     const noexcept
     {
-        auto block = get_block(index);
-        index = (index + block->get_leap(index)) & mMask;
-        if (LIKELY(block->is_local(index)))
+        auto block = get_block(ifrom);
+        size_type index = (ifrom + block->get_leap(ifrom)) & mMask;
+        if (LIKELY(block->is_local(ifrom)))
         {
             notrust = false;
             return index;
@@ -1753,11 +2023,11 @@ private:
         else
         {
             notrust = true;
-            return extended_leap(ihead, index, block->get_hash(index));
+            return extended_leap(ihead, index, block->get_hash(ifrom));
         }
     }
 
-    /** @brief Cannot compare subhash with "leap'd to" entry. */
+    /** @note Cannot compare subhash with "leap'd to" entry. */
     NOINLINE
     size_type
     extended_leap(size_type ihead, size_type ifrom, uint8_t findhash)
@@ -1765,12 +2035,14 @@ private:
     {
         // Linear search through hashes.
         // Use same subhash as leap entry for search efficiency.
+        findhash = block_type::set_link_hash(findhash);
 
         // Iterate through every slot in the table starting at the leap point.
-        for (;;)
+        size_type i = 0;
+        for (; i < mLen; ++i)
         {
             auto block = get_block(ifrom);
-            SearchMap map = block->find(findhash);
+            search_map map = block->find(findhash);
             // For each entry in the map.
             while (map.has())
             {
@@ -1787,8 +2059,11 @@ private:
 
             ifrom = (ifrom + BLOCK_LEN) & mMask;
         }
+
+        return 0;
     }
 
+    /** @return True if we need to grow; false otherwise. */
     bool
     needToGrow()
     const noexcept
@@ -1796,6 +2071,7 @@ private:
         return mSize >= mLoad;
     }
 
+    /** @brief Grow the map. */
     void
     grow()
     {
@@ -1809,6 +2085,7 @@ private:
         resize_to(newLen);
     }
 
+    /** @return Smallest power of 2 >= n. */
     size_type
     to_power_2(size_type n)
     {
@@ -1837,6 +2114,7 @@ private:
         return p;
     }
 
+    /** @brief Resize the map (bigger/smaller). */
     NOINLINE
     void
     resize_to(size_type minLen)
@@ -1868,7 +2146,8 @@ private:
 
         if (mSize)
         {
-            iterator start{ oldBlock, 0 };
+            mSize = 0;
+            iterator start{ oldBlock, 0, IteratorLeap{} };
             const_iterator stop{ oldBlock, oldLen };
 
             while (start != stop)
@@ -1881,6 +2160,7 @@ private:
         deallocate_blocks(oldBlock, oldLen);
     }
 
+    /** @return Needed bytes for table (not sentinel). */
     size_type
     memory_size(size_type len)
     const noexcept
@@ -1888,27 +2168,38 @@ private:
         return sizeof(block_type) * (len / BLOCK_LEN);
     }
 
+    /** @return Total memory size for deallocation. */
+    size_type
+    total_memory_size(size_type len)
+    {
+        return memory_size(len) + block_type::sentinel_memory_size();
+    }
+
+    /** @brief Allocate and initialize memory. */
     block_type*
     allocate_blocks(size_type len)
     {
         size_type memory = memory_size(len);
-
-        unsigned char *p = allocator_traits::allocate(*this, memory);
-        block_type::set_empty_all(p, memory);
+        size_type smemory = block_type::sentinel_memory_size();
+        unsigned char *p = allocator_traits::allocate(*this, memory + smemory);
+        block_type::fill_empty(p, memory);
+        block_type::fill_sentinel(p + memory);
         block_type* b = reinterpret_cast<block_type*>(p);
         return b;
     }
 
+    /** @brief Free our memory. */
     void
     deallocate_blocks(block_type* b, size_type len)
     {
         if (reinterpret_cast<block_type*>(&NULL_BLOCK) != b)
         {
-            size_type memory = memory_size(len);
+            size_type memory = total_memory_size(len);
             allocator_traits::deallocate(*this, reinterpret_cast<typename allocator_traits::pointer>(b), memory);
         }
     }
 
+    /** @brief Call destructor on every value. */
     void
     destroy_values()
     noexcept
@@ -1923,12 +2214,13 @@ private:
         }
     }
 
+    /** @brief Set every entry to empty. */
     void
     clear_data()
     noexcept
     {
         size_type memory = memory_size(mLen);
-        block_type::set_empty_all(mBlock, memory);
+        block_type::fill_empty(mBlock, memory);
     }
 };
 
@@ -1937,7 +2229,7 @@ private:
 
 template <typename Key,
           typename T,
-          typename Hash = FibonacciHash<Key>,
+          typename Hash = fibonacci_hash<Key>,
           typename Pred = std::equal_to<Key>,
           typename Alloc = std::allocator<std::pair<Key, T> >
           >

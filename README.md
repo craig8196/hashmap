@@ -164,13 +164,13 @@ make all ops=3 # Will set flag -O3
 
 Run test:
 ```bash
-make test target=simple # Name of test file is simple.c
+make test target=prove # Name of test file is prove.cpp
 ```
 
 Run a test with alternate hashmap:
 ```bash
-./acquire.sh # Download Malte Skarupke's hashmap variations
-make test target=insertspeed compiler=g++ hashmap=UNORDERED_MAP
+./acquire.sh # Download hashmap variations
+make test target=perform hashmap=UNORDERED_MAP
 # Possible hashmaps:
 # HASHMAP (default)
 # UNORDERED_MAP
@@ -182,11 +182,11 @@ make test target=insertspeed compiler=g++ hashmap=UNORDERED_MAP
 
 Run a test with profiling and a specific target:
 ```bash
-make test prof=coverage target=insertspeed # See out/index.html
+make test prof=coverage target=prove # See out/index.html
 ```
 
 Run with gprof:
 ```bash
-make test prof=gprof target=insertspeed
+make test prof=gprof target=perform
 ```
 
