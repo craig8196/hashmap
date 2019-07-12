@@ -36,6 +36,10 @@ namespace hashit
 }
 
 static constexpr int BLOCK_LEN = crj::detail::BLOCK_LEN;
+
+#if 1
+template class crj::unordered_map<int, bool>;
+#endif
 using map_type = crj::unordered_map<int, bool>;
 
 int
@@ -230,6 +234,7 @@ main(void)
         cout << "PASSED LARGER LINEAR MULTIPLE OF 8 TEST" << endl;
     }
 
+#if 0
     {
         // Simple random number insertions.
         map_type map;
@@ -237,8 +242,8 @@ main(void)
         // Generate numbers.
         const int len = 10000;
         int seed = 0;
-        // int forceseed = 1559537524;
         int forceseed = FORCESEED;
+        forceseed = 1562918581;
         int *n = rand_intarr_new(len, &seed, forceseed);
         cout << "SEED: " << seed << endl;
 
@@ -251,11 +256,13 @@ main(void)
             auto p = map.insert({k, true});
             assert(p.second && "Fail: insert unique");
 
+#if 0
             if (!map.invariant(&cout))
             {
                 map.print();
                 exit(1);
             }
+#endif
 
             p = map.insert({k, true});
             assert(!p.second && "Fail: insert exist");
@@ -283,6 +290,7 @@ main(void)
 
         cout << "PASSED RANDOM INSERT/ERASE TEST" << endl;
     }
+#endif
 
     return 0;
 }

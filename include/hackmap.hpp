@@ -298,6 +298,16 @@ public:
     const noexcept
     { return mHash[i % BLOCK_LEN]; }
 
+    uint8_t
+    get_hash_only(size_type i)
+    const noexcept
+    { return mHash[i % BLOCK_LEN] & HASH_MASK; }
+
+    uint8_t
+    get_hash_as_link(size_type i)
+    const noexcept
+    { return set_link_hash(mHash[i % BLOCK_LEN]); }
+
     void
     set_hash(size_type i, uint8_t hash)
     noexcept
@@ -1531,7 +1541,7 @@ private:
         }
         else
         {
-            frag = block_type::clear_link_hash(blocktail->get_hash(itail));
+            frag = blocktail->get_hash_only(itail);
         }
 
         blockprev->set_end(iprev);
@@ -1539,7 +1549,7 @@ private:
 
         if (UNLIKELY(noTrustFirst && iprev != ihead))
         {
-            cascade(ihead, ihead, frag);
+            cascade(ihead, ihead, block_type::set_link_hash(frag));
         }
 
         blockhead->set_hash(ihead, frag);
@@ -1769,7 +1779,7 @@ private:
         }
         else
         {
-            shash = block_type::set_link_hash(block->get_hash(iprev));
+            shash = block->get_hash_as_link(iprev);
             block->set_find(iprev);
         }
     }
@@ -1797,7 +1807,7 @@ private:
         size_type inext = leap(ihead, iprev, scrap);
 
         // Propagate the subhash.
-        uint8_t subhashprev = prev->get_hash(iprev);
+        uint8_t subhashprev = prev->get_hash_as_link(iprev);
         subhashprev = block_type::set_link_hash(subhashprev);
         cascade(ihead, inext, subhashprev);
 
@@ -1846,7 +1856,7 @@ private:
             // Perform the search BEFORE we change the search hash.
             size_type ifrom = (inext + block->get_leap(inext)) & mLen;
             size_type inextnext = extended_leap(ihead, ifrom,
-                                                block->get_hash(inext));
+                                                block->get_hash_as_link(inext));
             // We can change the next's subhash.
             block->set_hash(inext, newsubhash);
 
@@ -2023,7 +2033,7 @@ private:
         else
         {
             notrust = true;
-            return extended_leap(ihead, index, block->get_hash(ifrom));
+            return extended_leap(ihead, index, block->get_hash_as_link(ifrom));
         }
     }
 
@@ -2227,6 +2237,7 @@ private:
 
 } /* namespace detail */
 
+#if 0
 template <typename Key,
           typename T,
           typename Hash = fibonacci_hash<Key>,
@@ -2242,6 +2253,27 @@ using unordered_map =
                           typename std::allocator_traits<Alloc>::template
                           rebind_alloc<unsigned char>
                           >;
+#endif
+template <typename Key,
+          typename T,
+          typename Hash = fibonacci_hash<Key>,
+          typename Pred = std::equal_to<Key>,
+          typename Alloc = std::allocator<std::pair<Key, T> >
+          >
+class unordered_map
+    : public detail::unordered_map 
+             <99,
+              Key,
+              T,
+              Hash,
+              Pred,
+              typename std::allocator_traits<Alloc>::template
+                       rebind_alloc<unsigned char>
+              >
+{
+};
+
+
 
 } /* namespace crj */
 

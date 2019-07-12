@@ -64,3 +64,4 @@ main_coverage.info
 tags
 test/*.hpp
 .*
+Coverage.*

@@ -9,16 +9,11 @@ TDIR = ./test
 ODIR = ./obj
 LDIR = ./lib
 
-AR = ar
-CC = g++
-CFLAGS = -Wall -Wextra -Werror -pedantic -msse2 -g $(DEBUG) $(OPS) $(PROF)
-IFLAGS = -I$(IDIR)
-LIBS =
-
 PROF = 
 ifdef prof
 ifeq ($(prof), coverage)
-PROF += -fprofile-arcs -ftest-coverage
+PROF += -fprofile-arcs -lgcov -ftest-coverage --coverage \
+		-fno-inline -fno-inline-small-functions -fno-default-inline
 endif
 ifeq ($(prof), gprof)
 PROF += -pg
@@ -32,8 +27,14 @@ ifneq ($(strip $(ops)),)
 endif
 endif
 
+AR = ar
+CC = g++
+CFLAGS = -Wall -Wextra -Werror -pedantic -msse2 -g $(DEBUG) $(OPS) $(PROF)
+IFLAGS = -I$(IDIR)
+LIBS =
+
 DEFINES =
-TESTFILE =simple
+TESTFILE =prove
 ifdef target
 ifneq ($(strip $(target)),)
 TESTFILE =$(target)
@@ -130,13 +131,17 @@ doc:
 test: $(OBJS) $(UTILOBJ)
 	$(CC) $(CFLAGS) $(IFLAGS) $(DEFINES) $(LIBS) $^ $(TDIR)/$(TESTFILE).$(EXT) -o $(TDIR)/$(TESTFILE).o
 	@echo "START TEST: $(TESTFILE)"
-#	@$(TDIR)/$(TESTFILE).o > tmp.txt
+ifdef prof
+ifeq ($(prof), coverage)
+	@lcov -c -i -b . -d . -o Coverage.baseline
+endif
+endif
 	@$(TDIR)/$(TESTFILE).o && echo "PASSED" || echo "FAILED"
 ifdef prof
 ifeq ($(prof), coverage)
-	@gcov -m hashmap.c
-	@lcov --capture --directory obj --output-file main_coverage.info
-	@genhtml main_coverage.info --output-directory out
+	@lcov -c -b . -d . -o Coverage.out
+	@lcov -a Coverage.baseline -a Coverage.out -o Coverage.combined
+	@genhtml Coverage.combined --output-directory out
 endif
 ifeq ($(prof), gprof)
 	gprof $(TDIR)/$(TESTFILE).o gmon.out > analysis.txt
@@ -145,5 +150,5 @@ endif
 
 .PHONY: clean
 clean:
-	@rm -rf $(ODIR) $(LDIR) $(TDIR)/*.o out/ gmon.out *.txt *.info *.gcda *.gcno && echo "CLEANED!" || echo "FAILED TO CLEANUP!"
+	@rm -rf $(ODIR) $(LDIR) $(TDIR)/*.o out/ gmon.out *.txt *.info *.gcda *.gcno Coverage.* && echo "CLEANED!" || echo "FAILED TO CLEANUP!"
 
