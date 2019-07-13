@@ -15,6 +15,8 @@
 
 using namespace std;
 
+#define EDGEMAX (1024)
+
 namespace hashit
 {
     class edge_hash
@@ -23,23 +25,23 @@ namespace hashit
         size_t
         operator()(const int& k) const
         {
-            if (k < 512)
+            size_t h = k;
+            if (k >= EDGEMAX)
             {
-                return k;
+                h = 3 | (size_t(k) << ((sizeof(size_t) * 8) - 6));
             }
-            else
-            {
-                return 3;
-            }
+
+            return h;
         }
     };
 }
 
 static constexpr int BLOCK_LEN = crj::detail::BLOCK_LEN;
 
-#if 1
+template class crj::detail::unordered_map<100, int, bool, hashit::edge_hash>;
+using map_edge_type = crj::detail::unordered_map<100, int, bool, hashit::edge_hash>;
+
 template class crj::unordered_map<int, bool>;
-#endif
 using map_type = crj::unordered_map<int, bool>;
 
 int
@@ -119,7 +121,7 @@ main(void)
             assert(1 == map.count(i) && "Fail: not in map");
         }
         assert(map.size() == crj::detail::BLOCK_LEN && "Fail: wrong size");
-        bool pass_invariant = map.invariant();
+        bool pass_invariant = map.invariant(&cout);
         if (!pass_invariant)
         {
             map.print(cout);
@@ -131,51 +133,79 @@ main(void)
 
     {
         // Test edge cases with insertion.
-        crj::detail::unordered_map<100, int, bool, hashit::edge_hash> map(0, hashit::edge_hash{});
+        map_edge_type map(0, hashit::edge_hash{});
 
-        assert(map.hash_function()(511) == 511 && "Fail: hash function check");
+        assert(map.hash_function()(EDGEMAX - 1) == (EDGEMAX - 1) && "Fail: hash function check");
 
         // Fill the map with direct hits.
-        for (int i = 0; i < 512; ++i)
+        for (int i = 0; i < EDGEMAX; ++i)
         {
             //cout << "Emplacing: " << i << endl;
             map.emplace(i, true);
         }
-        assert(map.size() == 512 && "Fail: map size not 512");
-        assert(map.bucket_count() == 512 && "Fail: map length not 512");
+        assert(map.size() == EDGEMAX && "Fail: map size not 512");
+        assert(map.bucket_count() == EDGEMAX && "Fail: map length not 512");
+
+        constexpr int b = EDGEMAX + 5;
 
         map.erase(3);// Where large numbers get inserted.
         map.erase(5);
-        map.emplace(513, false);
-        map.emplace(514, false);
+        map.emplace(b + 1, false);
+        map.emplace(b + 2, false);
+        assert(map.invariant(&cout) && "Fail: invariant");
         // Force long leap.
         map.erase(500);
-        map.emplace(515, false);
+        map.emplace(b + 3, false);
+        assert(map.invariant(&cout) && "Fail: invariant");
         // Force wrap around.
         map.erase(0);
-        map.emplace(516, false);
+        map.emplace(b + 4, false);
+        assert(map.invariant(&cout) && "Fail: invariant");
         // Force insert into middle with extended leap.
         map.erase(100);
-        map.emplace(517, false);
+        map.emplace(b + 5, false);
+        assert(map.invariant(&cout) && "Fail: invariant");
         // Force insert into middle with normal leap.
-        map.erase(300);
-        map.emplace(518, false);
+        map.erase(b + 5);
+        map.emplace(100, true);
+        assert(map.invariant(&cout) && "Fail: invariant");
+        map.erase(400);
+        map.emplace(b + 5, false);
+        assert(map.invariant(&cout) && "Fail: invariant");
         // Erase our head.
-        map.erase(513);
+        map.erase(b + 1);
+        assert(map.invariant(&cout) && "Fail: invariant");
         // Erase element with large leap.
-        map.erase(517);
+        map.erase(b + 5);
+        assert(map.invariant(&cout) && "Fail: invariant");
         // Erase remaining elements.
-        map.erase(518);
-        map.erase(516);
-        map.erase(515);
-        map.erase(514);
+        map.erase(b + 4);
+        map.erase(b + 2);
+        map.erase(b + 3);
+        assert(map.invariant(&cout) && "Fail: invariant");
 
-        bool pass_invariant = map.invariant(&cout);
-        if (!pass_invariant)
+        // Reinsert everything.
+        for (int i = 0; i < EDGEMAX; ++i)
         {
-            map.print(cout);
+            map.insert({i, true});
         }
-        assert(pass_invariant && "Fail: invariant");
+
+        // Perform upsert on non-head.
+        map.erase(3);
+        map.erase(8);
+        map.insert({b + 1, false});
+        map.insert({b + 2, false}); // Tail.
+        assert(false == map[b + 2] && "Fail: value is false");
+        map.emplace(b + 2, true);
+        assert(true == map[b + 2] && "Fail: value is true");
+
+        // Remove non-exist on single entry list (head only).
+        map.erase(b + 5);
+        map.erase(b + 2);
+        map.erase(b + 4);
+
+        // Clear data.
+        map.clear();
 
         cout << "PASSED BASIC EDGE CASE TEST" << endl;
     }
@@ -210,6 +240,8 @@ main(void)
         // Larger linear multiple of 8 test.
         map_type map;
 
+        map.reserve(1024);
+
         int max = 40000;
         int i;
         for (i = 0; i < max; ++i)
@@ -234,7 +266,6 @@ main(void)
         cout << "PASSED LARGER LINEAR MULTIPLE OF 8 TEST" << endl;
     }
 
-#if 0
     {
         // Simple random number insertions.
         map_type map;
@@ -256,14 +287,6 @@ main(void)
             auto p = map.insert({k, true});
             assert(p.second && "Fail: insert unique");
 
-#if 0
-            if (!map.invariant(&cout))
-            {
-                map.print();
-                exit(1);
-            }
-#endif
-
             p = map.insert({k, true});
             assert(!p.second && "Fail: insert exist");
 
@@ -275,7 +298,6 @@ main(void)
 
         assert(map.invariant() && "Fail: invariant");
 
-#if 0
         for (i = 0; i < len; ++i)
         {
             int k = n[i];
@@ -284,13 +306,11 @@ main(void)
         }
 
         assert(map.invariant() && "Fail: invariant");
-#endif
 
         rand_intarr_free(n);
 
         cout << "PASSED RANDOM INSERT/ERASE TEST" << endl;
     }
-#endif
 
     return 0;
 }

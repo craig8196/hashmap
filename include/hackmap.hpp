@@ -95,7 +95,7 @@ struct fibonacci_hash: public Hash
      * Seems impractical to find nearest prime number, so let's make it odd.
      * 11400714819323198487
      */
-    static constexpr size_type FIB = size_type(11400714819323198487ULL);
+    static constexpr size_type FIB = size_type(11400714819323198485ULL);
 #else
     // Error already reported above.
 #endif
@@ -499,7 +499,11 @@ public:
         }
 
         template <bool OtherIsConstant,
-                  typename = typename std::enable_if<IsConstant && !OtherIsConstant>::type>
+                  typename =
+                      typename std::enable_if<IsConstant
+                                              && !OtherIsConstant>
+                                              ::type
+                  >
         Iterator&
         operator=(const Iterator<OtherIsConstant>& o)
         noexcept
@@ -588,7 +592,8 @@ public:
     };
 
 private:
-    static constexpr size_type MAX_SIZE = std::numeric_limits<size_type>::max() / 2;
+    static constexpr size_type MAX_SIZE =
+        std::numeric_limits<size_type>::max() / 2;
     block_type* mBlock      = reinterpret_cast<block_type*>(&NULL_BLOCK);
     size_type   mSize       = 0;
     size_type   mLoad       = 0;
@@ -698,7 +703,7 @@ public:
         : hasher(hash), key_equal(equal), allocator_type(alloc)
     {
         reserve(count);
-        insert(il.cbegin(), il.cend());
+        insert(il.begin(), il.end());
     }
 
     ~unordered_map()
@@ -894,7 +899,8 @@ public:
                 {
                     if (compare_keys(block->get_value(ihead).first, k))
                     {
-                        allocator_traits::destroy(*this, block->get_value_ptr(ihead));
+                        allocator_traits::destroy(*this,
+                            block->get_value_ptr(ihead));
                         if (LIKELY(block->is_end(ihead)))
                         {
                             block->set_empty(ihead);
@@ -928,7 +934,8 @@ public:
                         {
                             unlink(ihead, iprev, index);
                             block->set_empty(index);
-                            allocator_traits::destroy(*this, block->get_value_ptr(index));
+                            allocator_traits::destroy(*this,
+                                block->get_value_ptr(index));
                             --mSize;
                             return 1;
                         }
@@ -1011,7 +1018,12 @@ public:
         return upsert<false, false, false>(val).first;
     }
 
-    template <typename P>
+    template <typename P,
+              typename =
+                  typename std::enable_if<typeid(P) == typeid(const_iterator)
+                                          && typeid(P) == typeid(iterator)>
+                                          ::type
+              >
     iterator
     insert(const_iterator UNUSED(hint), P&& val)
     {
@@ -1172,13 +1184,14 @@ public:
     mapped_type&
     operator[](const key_type& k)
     {
-        return upsert<true, false, false>(k, value_type()).first->second;
+        return upsert<false, false, false>(k, mapped_type()).first->second;
     }
 
     mapped_type&
     operator[](key_type&& k)
     {
-        return upsert<true, false, false>(std::move(k), value_type()).first->second;
+        return upsert<false, false, false>(std::move(k),
+                                          mapped_type()).first->second;
     }
 
     void
@@ -1389,9 +1402,20 @@ public:
     print_block(std::ostream& os, size_type index)
     const
     {
+        os << "BLOCK: " << (index / BLOCK_LEN) << std::endl;
+
         auto block = get_block(index);
         for (int i = 0; i < BLOCK_LEN; ++i)
         {
+            if (i == (BLOCK_LEN / 2))
+            {
+                os << std::endl;
+            }
+            else if (i)
+            {
+                os << " | ";
+            }
+
             std::ios_base::fmtflags flags = os.flags();
             uint8_t hash = block->get_hash_by_subindex(i);
             uint8_t leap = block->get_leap_by_subindex(i);
@@ -1411,8 +1435,8 @@ public:
                 os << ": ";
                 os << ref.first << ' ' << ref.second;
             }
-            os << std::endl;
         }
+        os << std::endl;
     }
 
     void
@@ -1521,8 +1545,10 @@ private:
         }
 
         auto blockhead = get_block(ihead);
-        ::new (blockhead->get_value_ptr(ihead))
-            value_type(std::move(blocktail->get_value(itail)));
+        allocator_traits::construct(*this, blockhead->get_value_ptr(ihead),
+                                    std::move(blocktail->get_value(itail)));
+        //::new (blockhead->get_value_ptr(ihead))
+        //    value_type(std::move(blocktail->get_value(itail)));
 
         block_type* blockprev;
         if (LIKELY(iprev == ihead))
@@ -1619,11 +1645,16 @@ private:
                             {
                                 if (DoUpsert)
                                 {
-                                    allocator_traits::destroy(*this, block->get_value_ptr(index));
-                                    allocator_traits::construct(*this, block->get_value_ptr(index), std::forward<UpsertKey>(k), std::forward<Args>(args)...);
+                                    allocator_traits::destroy(*this,
+                                        block->get_value_ptr(index));
+                                    allocator_traits::construct(*this,
+                                        block->get_value_ptr(index),
+                                        std::forward<UpsertKey>(k),
+                                        std::forward<Args>(args)...);
                                 }
 
-                                return std::make_pair<iterator, bool>({mBlock, index}, false);
+                                return std::make_pair<iterator, bool>(
+                                    {mBlock, index}, false);
                             }
                         }
 
@@ -1644,15 +1675,21 @@ private:
                                 && (frag == block->get_hash(index)
                                     || notrust))
                             {
-                                if (compare_keys(block->get_value(index).first, k))
+                                if (compare_keys(block->get_value(index).first,
+                                                 k))
                                 {
                                     if (DoUpsert)
                                     {
-                                        allocator_traits::destroy(*this, block->get_value_ptr(index));
-                                        ::new (block->get_value_ptr(index)) value_type(std::forward<UpsertKey>(k), std::forward<Args>(args)...);
+                                        allocator_traits::destroy(*this,
+                                            block->get_value_ptr(index));
+                                        allocator_traits::construct(*this,
+                                            block->get_value_ptr(index),
+                                            std::forward<UpsertKey>(k),
+                                            std::forward<Args>(args)...);
                                     }
 
-                                    return std::make_pair<iterator, bool>({mBlock, index}, false);
+                                    return std::make_pair<iterator, bool>(
+                                        {mBlock, index}, false);
                                 }
                             }
 
@@ -1674,7 +1711,9 @@ private:
             }
 
             block->set_hash(index, frag);
-            ::new (block->get_value_ptr(index)) value_type(std::forward<UpsertKey>(k), std::forward<Args>(args)...);
+            allocator_traits::construct(*this, block->get_value_ptr(index),
+                                        std::forward<UpsertKey>(k),
+                                        std::forward<Args>(args)...);
             ++mSize;
             return std::make_pair<iterator, bool>({mBlock, index}, true);
         }
@@ -1793,6 +1832,7 @@ private:
         // If the new leap stays local then we have an efficient solution.
         if (prev->is_local(iprev) && un->is_local(iunlink))
         {
+            // Calculate the distance from prev to next.
             size_type dist = (size_type)(prev->get_leap(iprev))
                            + (size_type)(un->get_leap(iunlink));
             if (LIKELY(block_type::can_leap(dist)))
@@ -1802,13 +1842,11 @@ private:
             }
         }
 
-        // Calculate the distance from prev to next.
         bool scrap;
-        size_type inext = leap(ihead, iprev, scrap);
+        size_type inext = leap(ihead, iunlink, scrap);
 
         // Propagate the subhash.
         uint8_t subhashprev = prev->get_hash_as_link(iprev);
-        subhashprev = block_type::set_link_hash(subhashprev);
         cascade(ihead, inext, subhashprev);
 
         // Good, we can just replace the previous leap.
@@ -1869,45 +1907,6 @@ private:
         block->set_hash(inext, newsubhash);
     }
 
-
-    void
-    decrease_load(size_type entryLen)
-    {
-        size_type prevLoad = mLoad;
-        mLoad = size_type(((double)MaxLoadFactor / 100.0) * (double)entryLen);
-        if (mLoad < mSize)
-        {
-            mLoad = prevLoad / 2;
-        }
-        if (mLoad < (entryLen / 2))
-        {
-            mLoad = entryLen / 2;
-        }
-        if (mLoad > entryLen)
-        {
-            mLoad = entryLen;
-        }
-    }
-
-    void
-    increase_load(size_type entryLen)
-    {
-        size_type prevLoad = mLoad;
-        mLoad = size_type(((double)MaxLoadFactor / 100.0) * (double)entryLen);
-        if (mLoad < prevLoad)
-        {
-            mLoad = prevLoad * 2;
-        }
-        if (mLoad < (entryLen / 2))
-        {
-            mLoad = entryLen / 2;
-        }
-        if (mLoad > entryLen)
-        {
-            mLoad = entryLen;
-        }
-    }
-
     size_type
     force_load(size_type minLoad)
     const noexcept
@@ -1919,6 +1918,14 @@ private:
     update_load(size_type len)
     {
         mLoad = size_type(((double)MaxLoadFactor / 100.0) * (double)len);
+        if (mLoad > len)
+        {
+            mLoad = len;
+        }
+        else if (mLoad < (len / 2))
+        {
+            mLoad = (len / 2);
+        }
     }
 
     size_type
@@ -1927,12 +1934,15 @@ private:
         return hasher::operator()(kv.first);
     }
 
+#if 0
+    // TODO Needed?
     size_type
     hash_key(const value_type& kv)
     const
     {
         return hasher::operator()(kv.first);
     }
+#endif
 
     template <typename HashKey>
     size_type
@@ -1989,14 +1999,6 @@ private:
         return ((iend + mLen) - istart) & mMask;
     }
 
-    size_type
-    block_dist(size_type istart, size_type iend)
-    {
-        istart = istart / BLOCK_LEN;
-        iend = iend / BLOCK_LEN;
-        return ((iend + (mLen / BLOCK_LEN)) - istart);
-    }
-
     block_type*
     get_block(size_type index)
     const noexcept
@@ -2008,7 +2010,7 @@ private:
     combine_index(size_type index, int isub)
     const noexcept
     {
-        return (index & ~(BLOCK_LEN - 1)) + isub;
+        return block_type::construct_index(index, isub);
     }
 
     uint8_t
@@ -2059,7 +2061,8 @@ private:
                 // Discover the index that we're jumping to and test it
                 // to see if it is part of the same linked list.
                 int isub = map.next();
-                size_type iheadtest = key_to_index(block->get_value(isub).first);
+                size_type iheadtest =
+                    key_to_index(block->get_value(isub).first);
                 if (ihead == iheadtest)
                 {
                     return combine_index(ifrom, isub);
@@ -2141,6 +2144,11 @@ private:
             return;
         }
 
+        if (lenPwr2 < minLen)
+        {
+            throw std::overflow_error("crj::unordered_map size overflow");
+        }
+
         block_type* oldBlock = mBlock;
         size_type oldLen = mLen;
 
@@ -2162,7 +2170,7 @@ private:
 
             while (start != stop)
             {
-                upsert<false, true, false>(*start);
+                upsert<false, true, false>(std::move(*start));
                 ++start;
             }
         }
@@ -2205,7 +2213,9 @@ private:
         if (reinterpret_cast<block_type*>(&NULL_BLOCK) != b)
         {
             size_type memory = total_memory_size(len);
-            allocator_traits::deallocate(*this, reinterpret_cast<typename allocator_traits::pointer>(b), memory);
+            allocator_traits::deallocate(*this,
+                 reinterpret_cast<typename allocator_traits::pointer>(b),
+                 memory);
         }
     }
 
@@ -2230,7 +2240,8 @@ private:
     noexcept
     {
         size_type memory = memory_size(mLen);
-        block_type::fill_empty(mBlock, memory);
+        block_type::fill_empty(reinterpret_cast<unsigned char *>(mBlock),
+                               memory);
     }
 };
 

@@ -12,7 +12,7 @@ LDIR = ./lib
 PROF = 
 ifdef prof
 ifeq ($(prof), coverage)
-PROF += -fprofile-arcs -lgcov -ftest-coverage --coverage \
+PROF += -fprofile-arcs -ftest-coverage --coverage \
 		-fno-inline -fno-inline-small-functions -fno-default-inline
 endif
 ifeq ($(prof), gprof)
@@ -25,6 +25,11 @@ ifdef ops
 ifneq ($(strip $(ops)),)
 	OPS = -O$(ops)
 endif
+endif
+
+ifdef prof
+# Additional inlining prevention.
+	OPS = -O0
 endif
 
 AR = ar
