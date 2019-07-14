@@ -20,21 +20,21 @@ PROF += -pg
 endif
 endif
 
-OPS = -O2
-ifdef ops
-ifneq ($(strip $(ops)),)
-	OPS = -O$(ops)
+OPTIMIZE = -O2
+ifdef op_level
+ifneq ($(strip $(op_level)),)
+	OPTIMIZE = -O$(op_level)
 endif
 endif
 
 ifdef prof
 # Additional inlining prevention.
-	OPS = -O0
+	OPTIMIZE = -O0
 endif
 
 AR = ar
 CC = g++
-CFLAGS = -Wall -Wextra -Werror -pedantic -msse2 -g $(DEBUG) $(OPS) $(PROF)
+CFLAGS = -Wall -Wextra -Werror -pedantic -msse2 -g $(DEBUG) $(OPTIMIZE) $(PROF)
 IFLAGS = -I$(IDIR)
 LIBS =
 

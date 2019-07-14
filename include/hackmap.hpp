@@ -264,6 +264,11 @@ public:
     { return mHash[i % BLOCK_LEN] == EMPTY; }
 
     bool
+    is_empty_or_link(size_type i)
+    const noexcept
+    { return mHash[i % BLOCK_LEN] & (SPECIAL | LINK); }
+
+    bool
     is_full(size_type i)
     const noexcept
     { return !is_empty(i); }
@@ -286,10 +291,15 @@ public:
     bool
     is_local(size_type i)
     const noexcept
-    { return (mLeap[i % BLOCK_LEN] != FIND); }
+    { return !is_foreign(i); }
+
+    bool
+    is_foreign(size_type i)
+    const noexcept
+    { return mLeap[i % BLOCK_LEN] == FIND; }
 
     void
-    flag_unsearchable(size_type i)
+    set_nofind(size_type i)
     noexcept
     { mHash[i % BLOCK_LEN] = NOFIND; }
 
@@ -407,6 +417,11 @@ public:
     is_empty_by_subindex(int i)
     const noexcept
     { return mHash[i] == EMPTY; }
+
+    bool
+    is_nofind_by_subindex(int i)
+    const noexcept
+    { return mHash[i] == NOFIND; }
 
     bool
     is_head_by_subindex(int i)
@@ -593,7 +608,7 @@ public:
 
 private:
     static constexpr size_type MAX_SIZE =
-        std::numeric_limits<size_type>::max() / 2;
+        size_type(1) << ((sizeof(size_type) * 8) - 2);
     block_type* mBlock      = reinterpret_cast<block_type*>(&NULL_BLOCK);
     size_type   mSize       = 0;
     size_type   mLoad       = 0;
@@ -669,6 +684,7 @@ public:
             mLoad = std::move(o.mLoad);
             mLen = std::move(o.mLen);
             mMask = std::move(o.mMask);
+            o.set_moved_from();
         }
         else
         {
@@ -688,6 +704,7 @@ public:
             mLoad = std::move(o.mLoad);
             mLen = std::move(o.mLen);
             mMask = std::move(o.mMask);
+            o.set_moved_from();
         }
         else
         {
@@ -725,6 +742,7 @@ public:
         return block->get_value(index).second;
     }
 
+#if 0
     const mapped_type&
     at(const key_type& k)
     const
@@ -737,6 +755,7 @@ public:
         auto block = get_block(index);
         return block->get_value(index).second;
     }
+#endif
 
     iterator
     begin()
@@ -745,12 +764,14 @@ public:
         return iterator{ mBlock, 0, IteratorLeap{} };
     }
 
+#if 0
     const_iterator
     begin()
     const noexcept
     {
         return cbegin();
     }
+#endif
 
     size_type
     bucket(const key_type& k)
@@ -837,13 +858,16 @@ public:
         return iterator{ mBlock, mLen };
     }
 
+#if 0
     const_iterator
     end()
     const noexcept
     {
         return cend();
     }
+#endif
 
+#if 0
     std::pair<iterator, iterator>
     equal_range(const key_type& k)
     {
@@ -858,6 +882,7 @@ public:
             return { end(), end() };
         }
     }
+#endif
 
     std::pair<const_iterator, const_iterator>
     equal_range(const key_type& k)
@@ -971,6 +996,7 @@ public:
         return iterator{ mBlock, index };
     }
 
+#if 0
     const_iterator
     find(const key_type& k)
     const
@@ -978,6 +1004,7 @@ public:
         const size_type index = find_index(k);
         return const_iterator{ mBlock, index };
     }
+#endif
 
     allocator_type
     get_allocator()
@@ -1126,6 +1153,7 @@ public:
             mLoad = std::move(o.mLoad);
             mLen = std::move(o.mLen);
             mMask = std::move(o.mMask);
+            o.set_moved_from();
         }
         else
         {
@@ -1197,11 +1225,7 @@ public:
     void
     rehash(size_type n)
     {
-        if (mLen < n)
-        {
-            resize_to(n);
-        }
-        else if (mSize < n)
+        if (mSize <= n && n < mLen)
         {
             resize_to(n);
         }
@@ -1213,11 +1237,7 @@ public:
     {
         destroy_values();
         deallocate_blocks(mBlock, mLen);
-        mBlock = reinterpret_cast<block_type*>(&NULL_BLOCK);
-        mSize = 0;
-        mLoad = 0;
-        mLen = 0;
-        mMask = 0;
+        set_moved_from();
     }
 
     void
@@ -1225,7 +1245,7 @@ public:
     {
         if (mLoad < count)
         {
-            size_type lenFor = force_load(count);
+            size_type lenFor = len_by_force_load(count);
             resize_to(lenFor);
         }
     }
@@ -1245,9 +1265,14 @@ public:
             return;
         }
 
-        std::swap(*this, o);
+        std::swap(mBlock, o.mBlock);
+        std::swap(mSize, o.mSize);
+        std::swap(mLen, o.mLen);
+        std::swap(mLoad, o.mLoad);
+        std::swap(mMask, o.mMask);
     }
 
+#if DEBUG
     bool
     invariant_head(std::ostream* os,
                    size_type& size_lists,
@@ -1257,6 +1282,8 @@ public:
     {
         size_type index = ihead;
 
+        bool notrust = false;
+        uint8_t prevfrag = 0;
         size_type i = 0;
         for (; i < mLen; ++i)
         {
@@ -1286,7 +1313,30 @@ public:
                 }
             }
 
-            size_type myhead = key_to_index(block->get_value(index).first);
+            size_type hash = hash_key(block->get_value(index).first);
+            uint8_t frag = hash_fragment(hash);
+            if (index != ihead)
+            {
+                frag = block_type::set_link_hash(frag);
+            }
+            uint8_t myfrag = block->get_hash(index);
+            if (notrust)
+            {
+                frag = block_type::set_link_hash(prevfrag);
+            }
+            if (myfrag != frag)
+            {
+                if (nullptr != os)
+                {
+                    (*os) << "Incorrect hash at [" << index
+                          << "] expecting [" << unsigned(frag)
+                          << "] found [" << unsigned(myfrag)
+                          << "]" << std::endl;
+                }
+                return false;
+            }
+
+            size_type myhead = hash_to_index(hash);
             if (myhead != ihead)
             {
                 if (nullptr != os)
@@ -1304,7 +1354,7 @@ public:
                 break;
             }
 
-            bool notrust = false;
+            prevfrag = frag;
             index = leap(ihead, index, notrust);
             block = get_block(index);
         }
@@ -1333,6 +1383,23 @@ public:
     invariant(std::ostream* os)
     const noexcept
     {
+        if (reinterpret_cast<block_type*>(&NULL_BLOCK) == mBlock)
+        {
+            if (mSize != 0 || mLen != 0 || mLoad != 0 || mMask != 0)
+            {
+                if (nullptr != os)
+                {
+                    (*os) << "Invalid size/len/load/mask: "
+                          << mSize << '/'
+                          << mLen << '/'
+                          << mLoad << '/'
+                          << mMask << std::endl;
+                }
+                return false;
+            }
+            return true;
+        }
+
         size_type size_count = 0;
         size_type size_lists = 0;
 
@@ -1397,7 +1464,9 @@ public:
 
         return true;
     }
+#endif
 
+#if DEBUG
     void
     print_block(std::ostream& os, size_type index)
     const
@@ -1433,7 +1502,8 @@ public:
             {
                 auto ref = block->get_value_by_subindex(i);
                 os << ": ";
-                os << ref.first << ' ' << ref.second;
+                os << ref.first << ' ' << ref.second
+                   << " @[" << key_to_index(ref.first) << ']';
             }
         }
         os << std::endl;
@@ -1466,6 +1536,7 @@ public:
             os << "TABLE EMPTY" << std::endl;
         }
     }
+#endif
 
 private:
     template <typename FindKey>
@@ -1477,6 +1548,22 @@ private:
         size_type ihead = hash_to_index(hash);
         auto block = get_block(ihead);
 
+#if 1
+        if (block->is_empty_or_link(ihead))
+        {
+            return mLen;
+        }
+
+        uint8_t frag = hash_fragment(hash);
+
+        if (frag == block->get_hash(ihead))
+        {
+            if (compare_keys(block->get_value(ihead).first, k))
+            {
+                return ihead;
+            }
+        }
+#else
         if (block->is_empty(ihead))
         {
             return mLen;
@@ -1492,10 +1579,12 @@ private:
             }
         }
 
+        // Combined into the empty check.
         if (UNLIKELY(block->is_link(ihead)))
         {
             return mLen;
         }
+#endif
 
         if (block->is_end(ihead))
         {
@@ -1536,7 +1625,7 @@ private:
         size_type itail = leap(ihead, iprev, noTrustFirst);
         auto blocktail = get_block(itail);
 
-        bool noTrustFinal = false;
+        bool noTrustFinal = noTrustFirst;
         while (!blocktail->is_end(itail))
         {
             iprev = itail;
@@ -1547,8 +1636,6 @@ private:
         auto blockhead = get_block(ihead);
         allocator_traits::construct(*this, blockhead->get_value_ptr(ihead),
                                     std::move(blocktail->get_value(itail)));
-        //::new (blockhead->get_value_ptr(ihead))
-        //    value_type(std::move(blocktail->get_value(itail)));
 
         block_type* blockprev;
         if (LIKELY(iprev == ihead))
@@ -1627,15 +1714,7 @@ private:
                     }
                 }
 
-                if (!IsListInsert && UNLIKELY(block->is_link(ihead)))
-                {
-                    unlink_link_at(ihead);
-                    block->flag_unsearchable(ihead);
-                    --mSize;
-                    upsert<true, true, true>(std::move(block->get_value(ihead)));
-                    block->set_end(ihead);
-                }
-                else
+                if (LIKELY(IsListInsert || block->is_head(ihead)))
                 {
                     do
                     {
@@ -1704,6 +1783,15 @@ private:
                     index = link_empty(ihead, index, frag);
                     block = get_block(index);
                 }
+                //if (!IsListInsert && UNLIKELY(block->is_link(ihead)))
+                else
+                {
+                    unlink_link_at(ihead);
+                    block->set_nofind(ihead);
+                    --mSize;
+                    upsert<true, true, true>(std::move(block->get_value(ihead)));
+                    block->set_end(ihead);
+                }
             }
             else
             {
@@ -1767,7 +1855,7 @@ private:
             bool scrap;
             size_type inext = leap(ihead, ihead, scrap);
 
-            for (;;) 
+            for (;;)
             {
                 nextPos = ((inext + mLen) - ihead) & mMask;
                 if (emptyPos < nextPos)
@@ -1830,14 +1918,14 @@ private:
         auto prev = get_block(iprev);
 
         // If the new leap stays local then we have an efficient solution.
-        if (prev->is_local(iprev) && un->is_local(iunlink))
+        if (LIKELY(prev->is_local(iprev) && un->is_local(iunlink)))
         {
             // Calculate the distance from prev to next.
             size_type dist = (size_type)(prev->get_leap(iprev))
                            + (size_type)(un->get_leap(iunlink));
             if (LIKELY(block_type::can_leap(dist)))
             {
-                prev->set_leap(iprev, (uint8_t)dist);
+                prev->set_leap(iprev, uint8_t(dist));
                 return;
             }
         }
@@ -1879,6 +1967,14 @@ private:
 
         for (;;)
         {
+
+#if 1
+            if (block->is_local(inext))
+            {
+                // If we are at the end or next entry isn't search, we're done.
+                break;
+            }
+#else
             if (block->is_end(inext))
             {
                 // If the next entry is the end, we're done.
@@ -1890,11 +1986,13 @@ private:
                 // If the next entry isn't a search, we're done.
                 break;
             }
+#endif
             
             // Perform the search BEFORE we change the search hash.
-            size_type ifrom = (inext + block->get_leap(inext)) & mLen;
+            size_type ifrom = (inext + block->get_leap(inext)) & mMask;
             size_type inextnext = extended_leap(ihead, ifrom,
                                                 block->get_hash_as_link(inext));
+
             // We can change the next's subhash.
             block->set_hash(inext, newsubhash);
 
@@ -1908,7 +2006,7 @@ private:
     }
 
     size_type
-    force_load(size_type minLoad)
+    len_by_force_load(size_type minLoad)
     const noexcept
     {
         return size_type((100.0 / (double)MaxLoadFactor) * (double)minLoad);
@@ -2040,7 +2138,6 @@ private:
     }
 
     /** @note Cannot compare subhash with "leap'd to" entry. */
-    NOINLINE
     size_type
     extended_leap(size_type ihead, size_type ifrom, uint8_t findhash)
     const noexcept
@@ -2050,8 +2147,12 @@ private:
         findhash = block_type::set_link_hash(findhash);
 
         // Iterate through every slot in the table starting at the leap point.
+#if 0
         size_type i = 0;
         for (; i < mLen; ++i)
+#endif
+
+        for (;;)
         {
             auto block = get_block(ifrom);
             search_map map = block->find(findhash);
@@ -2072,8 +2173,9 @@ private:
 
             ifrom = (ifrom + BLOCK_LEN) & mMask;
         }
-
+#if 0
         return 0;
+#endif
     }
 
     /** @return True if we need to grow; false otherwise. */
@@ -2112,9 +2214,9 @@ private:
             return n;
         }
 
-        if (n > (std::numeric_limits<size_type>::max() / 4))
+        if (n > MAX_SIZE)
         {
-            return size_type(1) << ((sizeof(size_type) * 8) - 2);
+            return MAX_SIZE;
         }
 
         size_type p = 1;
@@ -2144,7 +2246,7 @@ private:
             return;
         }
 
-        if (lenPwr2 < minLen)
+        if (lenPwr2 < minLen || lenPwr2 < mSize)
         {
             throw std::overflow_error("crj::unordered_map size overflow");
         }
@@ -2242,6 +2344,18 @@ private:
         size_type memory = memory_size(mLen);
         block_type::fill_empty(reinterpret_cast<unsigned char *>(mBlock),
                                memory);
+    }
+
+    /** @brief Set the state for the moved-from object. */
+    void
+    set_moved_from()
+    noexcept
+    {
+        mBlock = reinterpret_cast<block_type*>(&NULL_BLOCK);
+        mSize = 0;
+        mLoad = 0;
+        mLen = 0;
+        mMask = 0;
     }
 };
 

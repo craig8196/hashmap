@@ -6,32 +6,54 @@
 #include <string.h>
 #include <time.h>
 
-#include "hashmap.h"
 #include "util.h"
 
 #ifndef FORCESEED
 #define FORCESEED (0)
 #endif
 
+#ifndef MAXITER
+#define MAXITER (100)
+#endif
+
+#ifndef MAXLEN
+#define MAXLEN (500000)
+#endif
+
+#ifdef HASHMAP
+#include "hackmap.hpp"
+#else
+
 #ifdef UNORDERED_MAP
 #include <unordered_map>
-#endif
+#else
 
 #ifdef BYTELL_HASH_MAP
 #include "bytell_hash_map.hpp"
-#endif
+#else
 
 #ifdef FLAT_HASH_MAP
 #include "flat_hash_map.hpp"
-#endif
+#else
 
 #ifdef UNORDERED_MAP_FIB
 #include "unordered_map.hpp"
-#endif
+#else
 
 #ifdef ROBINHOOD
 #include "robin_hood.hpp"
+#else
+
+#include <unordered_map>
+
 #endif
+#endif
+#endif
+#endif
+#endif
+#endif
+
+using namespace std;
 
 typedef enum state_e
 {
@@ -56,55 +78,52 @@ typedef struct entry_s
 } entry_t;
 
 #ifdef HASHMAP
-static int
-load_cb(int maxlen)
-{
-    return (int)((double)maxlen * 0.75);
-}
+template class crj::unordered_map<int, bool>;
+using map_type = crj::unordered_map<int, bool>;
+#else
+
+#ifdef UNORDERED_MAP
+using map_type = std::unordered_map<int, bool>;
+#else
+
+#ifdef BYTELL_HASH_MAP
+using map_type = ska::bytell_hash_map<int, bool>;
+#else
+
+#ifdef FLAT_HASH_MAP
+using map_type = ska::flat_hash_map<int, bool>;
+#else
+
+#ifdef UNORDERED_MAP_FIB
+using map_type = ska::unordered_map<int, bool>;
+#else
+
+#ifdef ROBINHOOD
+using map_type = robin_hood::unordered_map<int, bool>;
+#else
+
+using map_type = std::unordered_map<int, bool>;
+
 #endif
+#endif
+#endif
+#endif
+#endif
+#endif
+
+
 
 static void
 runtest(entry_t *e, int elen, int maxactions)
 {
-#ifdef HASHMAP
-    bool bval = true;
-    hashmap_t hmap;
-    hashmap_t *map = &hmap;
-    hashmap_init(map, sizeof(e[0].val), sizeof(bool), int_hash_cb, int_eq_cb);
-    hashmap_set_load_cb(map, load_cb);
-#ifdef ALLOW_RESERVE
-    hashmap_reserve(map, elen);
-#endif
-#endif
-#ifdef UNORDERED_MAP
-    std::unordered_map<int, bool> u;
-#ifdef ALLOW_RESERVE
-    u.reserve(elen);
-#endif
-#endif
-#ifdef BYTELL_HASH_MAP
-    ska::bytell_hash_map<int, bool> u;
-#ifdef ALLOW_RESERVE
-    u.reserve(elen);
-#endif
-#endif
-#ifdef FLAT_HASH_MAP
-    ska::flat_hash_map<int, bool> u;
-#ifdef ALLOW_RESERVE
-    u.reserve(elen);
-#endif
-#endif
-#ifdef UNORDERED_MAP_FIB
-    ska::unordered_map<int, bool> u;
-#ifdef ALLOW_RESERVE
-    u.reserve(elen);
-#endif
-#endif
-#ifdef ROBINHOOD
-    robin_hood::unordered_map<int, bool> u;
-#ifdef ALLOW_RESERVE
-    u.reserve(elen);
-#endif
+    map_type m;
+
+#if DEBUG
+    for (int eIndex = 0; eIndex < elen; ++eIndex)
+    {
+        e[eIndex].state = STATE_OUT;
+    }
+    size_t size = 0;
 #endif
 
     int action;
@@ -114,59 +133,83 @@ runtest(entry_t *e, int elen, int maxactions)
         for (i = 0; i < elen; ++i)
         {
             entry_t *el = &e[i];
+#if !DEBUG
             switch (el->actions[action])
             {
                 case ACTION_HAS:
                     {
-#ifdef HASHMAP
-                    hashmap_get(map, &el->val);
-#endif
-#if defined UNORDERED_MAP || defined BYTELL_HASH_MAP || defined FLAT_HASH_MAP || defined UNORDERED_MAP_FIB || defined ROBINHOOD
-                    u.find(el->val);
-#endif
+                        m.find(el->val);
                     }
                     break;
                 case ACTION_INS:
                     {
-#ifdef HASHMAP
-                    hashmap_insert(map, &el->val, &bval);
-#endif
-#if defined UNORDERED_MAP || defined BYTELL_HASH_MAP || defined FLAT_HASH_MAP || defined UNORDERED_MAP_FIB || defined ROBINHOOD
-                    u.insert({ el->val, true });
-#endif
+                        m.insert({ el->val, true });
                     }
                     break;
                 case ACTION_DEL:
                     {
-#ifdef HASHMAP
-                    hashmap_remove(map, &el->val, NULL, NULL);
-#endif
-#if defined UNORDERED_MAP || defined BYTELL_HASH_MAP || defined FLAT_HASH_MAP || defined UNORDERED_MAP_FIB || defined ROBINHOOD
-                    u.erase(el->val);
-#endif
+                        m.erase(el->val);
                     }
                     break;
 
             }
+#else
+            int key = el->val;
+            switch (el->actions[action])
+            {
+                case ACTION_HAS:
+                    {
+                        cout << "F: " << key << endl;
+                        if (STATE_OUT == el->state)
+                        {
+                            assert(m.find(key) == m.end() && "Fail: no find");
+                        }
+                        else
+                        {
+                            assert(m.find(key) != m.end() && "Fail: find");
+                        }
+                        assert(size == m.size() && "Fail: size");
+                    }
+                    break;
+                case ACTION_INS:
+                    {
+                        cout << "I: " << key << endl;
+                        if (STATE_OUT == el->state)
+                        {
+                            assert(m.emplace(key, true).second && "Fail: add");
+                            ++size;
+                        }
+                        else
+                        {
+                            assert(!m.emplace(key, true).second && "Fail: no add");
+                        }
+                        el->state = STATE_IN;
+                        assert(size == m.size() && "Fail: size");
+                        assert(m.find(key) != m.end() && "Fail: find");
+                    }
+                    break;
+                case ACTION_DEL:
+                    {
+                        cout << "D: " << key << endl;
+                        if (STATE_OUT == el->state)
+                        {
+                            assert(0 == m.erase(key) && "Fail: no erase");
+                        }
+                        else
+                        {
+                            assert(1 == m.erase(key) && "Fail: no erase");
+                            --size;
+                        }
+                        el->state = STATE_OUT;
+                        assert(size == m.size() && "Fail: size");
+                        assert(m.find(key) == m.end() && "Fail: find");
+                    }
+                    break;
+
+            }
+#endif
         }
     }
-
-
-#ifdef HASHMAP
-    hashmap_destroy(map);
-#endif
-#ifdef UNORDERED_MAP
-    // Auto cleanup
-#endif
-#ifdef BYTELL_HASH_MAP
-    // Auto cleanup
-#endif
-#ifdef FLAT_HASH_MAP
-    // Auto cleanup
-#endif
-#ifdef UNORDERED_MAP_FIB
-    // Auto cleanup
-#endif
 }
 
 static int
@@ -187,8 +230,8 @@ main(void)
     // seed = 1560374140;
     int seed = FORCESEED;
     int forceseed = FORCESEED;
-    const int maxiter = 1024;
-    const int maxlen = 1 << 13;
+    const int maxiter = MAXITER;
+    const int maxlen = MAXLEN;
 
     int nlen = maxlen + maxiter;
     int *n = rand_intarr_new(nlen, &seed, forceseed);
@@ -207,6 +250,8 @@ main(void)
             e[i].actions[j] = (action_t)rand_int_range(ACTION_HAS, ACTION_DEL);
         }
     }
+
+    rand_intarr_free(n);
 
     printf("Done generating random elements.\n");
 
@@ -251,6 +296,8 @@ main(void)
             ((double)totalops/seconds),
             (seconds*1000000000.0)/(double)totalops);
     }
+
+    free(e);
 
     return 0;
 }
