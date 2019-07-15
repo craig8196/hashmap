@@ -106,8 +106,7 @@ UTILOBJ = $(TDIR)/util.o
 
 
 all: $(OBJS)
-	ar rcs $(LDIR)/libhashmap.a $(OBJS)
-	$(CC) $(CFLAGS) $(IFLAGS) $(DEFINES) -c $(SRC) -shared -o $(LDIR)/libhashmap.so
+	@echo "NOTHING TO DO FOR ALL (SINGLE HEADER TEMPLATE IMPLEMENTATION)"
 
 .PHONY: dirs
 dirs:
@@ -122,11 +121,8 @@ $(TDIR)/%.o: $(TDIR)/%.c
 .PHONY: check
 check:
 	@echo "START CPPCHECK"
-	cppcheck --enable=warning,style,performance,portability,information -I $(IDIR) $(SRC)
+	cppcheck --enable=warning,style,performance,portability,information $(IDIR)/*.hpp
 	@echo "END CPPCHECK"
-	@echo "START CLANG/SCAN-BUILD"
-	scan-build make
-	@echo "END CLANG/SCAN-BUILD"
 
 .PHONY: doc
 doc:

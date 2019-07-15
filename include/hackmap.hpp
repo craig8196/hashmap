@@ -26,8 +26,8 @@
  * @brief Hash map implementation.
  */
 
-#ifndef CRJ_HASH_MAP_H
-#define CRJ_HASH_MAP_H
+#ifndef HACKMAP_HASH_MAP_H
+#define HACKMAP_HASH_MAP_H
 
 #include <cstring>
 #include <functional>
@@ -65,7 +65,7 @@
 
 #define UNUSED(x)
 
-namespace crj
+namespace hackmap
 {
 using size_type = std::size_t;
 
@@ -736,7 +736,7 @@ public:
         size_type index = find_index(k);
         if (index == mLen)
         {
-            throw std::out_of_range("crj::unordered_map key not found");
+            throw std::out_of_range("hackmap::unordered_map key not found");
         }
         auto block = get_block(index);
         return block->get_value(index).second;
@@ -750,7 +750,7 @@ public:
         size_type index = find_index(k);
         if (index == mLen)
         {
-            throw std::out_of_range("crj::unordered_map key not found");
+            throw std::out_of_range("hackmap::unordered_map key not found");
         }
         auto block = get_block(index);
         return block->get_value(index).second;
@@ -914,63 +914,61 @@ public:
         size_type ihead = hash_to_index(hash);
         auto block = get_block(ihead);
 
-        if (block->is_full(ihead))
+        if (block->is_empty_or_link(ihead))
         {
-            if (LIKELY(block->is_head(ihead)))
+            return 0;
+        }
+
+        uint8_t frag = hash_fragment(hash);
+
+        if (frag == block->get_hash(ihead))
+        {
+            if (compare_keys(block->get_value(ihead).first, k))
             {
-                uint8_t frag = hash_fragment(hash);
-
-                if (frag == block->get_hash(ihead))
+                allocator_traits::destroy(*this, block->get_value_ptr(ihead));
+                if (LIKELY(block->is_end(ihead)))
                 {
-                    if (compare_keys(block->get_value(ihead).first, k))
-                    {
-                        allocator_traits::destroy(*this,
-                            block->get_value_ptr(ihead));
-                        if (LIKELY(block->is_end(ihead)))
-                        {
-                            block->set_empty(ihead);
-                        }
-                        else
-                        {
-                            unlink_head_of_list(ihead);
-                        }
-                        --mSize;
-                        return 1;
-                    }
+                    block->set_empty(ihead);
                 }
-
-                if (block->is_end(ihead))
+                else
                 {
-                    return 0;
+                    unlink_head_of_list(ihead);
                 }
+                --mSize;
+                return 1;
+            }
+        }
 
-                size_type index = ihead;
-                frag = block_type::set_link_hash(frag);
-                for (;;)
+        if (block->is_end(ihead))
+        {
+            return 0;
+        }
+
+        size_type index = ihead;
+        frag = block_type::set_link_hash(frag);
+        for (;;)
+        {
+            bool notrust = false;
+            size_type iprev = index;
+            index = leap(ihead, index, notrust);
+            block = get_block(index);
+
+            if (frag == block->get_hash(index) || notrust)
+            {
+                if (compare_keys(block->get_value(index).first, k))
                 {
-                    bool notrust = false;
-                    size_type iprev = index;
-                    index = leap(ihead, index, notrust);
-                    block = get_block(index);
-
-                    if (frag == block->get_hash(index) || notrust)
-                    {
-                        if (compare_keys(block->get_value(index).first, k))
-                        {
-                            unlink(ihead, iprev, index);
-                            block->set_empty(index);
-                            allocator_traits::destroy(*this,
-                                block->get_value_ptr(index));
-                            --mSize;
-                            return 1;
-                        }
-                    }
-
-                    if (block->is_end(index))
-                    {
-                        return 0;
-                    }
+                    unlink(ihead, iprev, index);
+                    block->set_empty(index);
+                    allocator_traits::destroy(*this,
+                        block->get_value_ptr(index));
+                    --mSize;
+                    return 1;
                 }
+            }
+
+            if (block->is_end(index))
+            {
+                return 0;
             }
         }
         
@@ -1272,7 +1270,7 @@ public:
         std::swap(mMask, o.mMask);
     }
 
-#if DEBUG
+#ifdef DEBUG
     bool
     invariant_head(std::ostream* os,
                    size_type& size_lists,
@@ -1466,7 +1464,7 @@ public:
     }
 #endif
 
-#if DEBUG
+#ifdef DEBUG
     void
     print_block(std::ostream& os, size_type index)
     const
@@ -1616,7 +1614,6 @@ private:
         return mLen;
     }
 
-    NOINLINE
     void
     unlink_head_of_list(size_type ihead)
     {
@@ -1789,7 +1786,8 @@ private:
                     unlink_link_at(ihead);
                     block->set_nofind(ihead);
                     --mSize;
-                    upsert<true, true, true>(std::move(block->get_value(ihead)));
+                    upsert<true, true, true>(
+                        std::move(block->get_value(ihead)));
                     block->set_end(ihead);
                 }
             }
@@ -1911,6 +1909,7 @@ private:
         }
     }
 
+    NOINLINE
     void
     unlink_complex(size_type ihead, size_type iprev, size_type iunlink)
     {
@@ -2194,7 +2193,7 @@ private:
 
         if (UNLIKELY(newLen < mLen))
         {
-            throw std::overflow_error("crj::unordered_map size overflow");
+            throw std::overflow_error("hackmap::unordered_map size overflow");
         }
 
         resize_to(newLen);
@@ -2229,6 +2228,25 @@ private:
         return p;
     }
 
+    void
+    insert_move_from(block_type* b, size_type len)
+    {
+        size_type blen = len / BLOCK_LEN;
+
+        for (size_type i = 0; i < blen; ++i)
+        {
+            block_type* block = b + i;
+            search_map m = block->find_full();
+            while (m.has())
+            {
+                int sub = m.next();
+                upsert<false, true, false>(
+                    std::move(block->get_value_by_subindex(sub)));
+                m.clear(sub);
+            }
+        }
+    }
+
     /** @brief Resize the map (bigger/smaller). */
     NOINLINE
     void
@@ -2248,7 +2266,7 @@ private:
 
         if (lenPwr2 < minLen || lenPwr2 < mSize)
         {
-            throw std::overflow_error("crj::unordered_map size overflow");
+            throw std::overflow_error("hackmap::unordered_map size overflow");
         }
 
         block_type* oldBlock = mBlock;
@@ -2267,6 +2285,8 @@ private:
         if (mSize)
         {
             mSize = 0;
+            insert_move_from(oldBlock, oldLen);
+#if 0
             iterator start{ oldBlock, 0, IteratorLeap{} };
             const_iterator stop{ oldBlock, oldLen };
 
@@ -2275,6 +2295,7 @@ private:
                 upsert<false, true, false>(std::move(*start));
                 ++start;
             }
+#endif
         }
 
         deallocate_blocks(oldBlock, oldLen);
@@ -2387,7 +2408,7 @@ template <typename Key,
           >
 class unordered_map
     : public detail::unordered_map 
-             <99,
+             <97,
               Key,
               T,
               Hash,
@@ -2400,8 +2421,8 @@ class unordered_map
 
 
 
-} /* namespace crj */
+} /* namespace hackmap */
 
 
-#endif /* CRJ_HASH_MAP_H */
+#endif /* HACKMAP_HASH_MAP_H */
 

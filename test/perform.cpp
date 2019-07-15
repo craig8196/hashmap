@@ -78,8 +78,8 @@ typedef struct entry_s
 } entry_t;
 
 #ifdef HASHMAP
-template class crj::unordered_map<int, bool>;
-using map_type = crj::unordered_map<int, bool>;
+template class hackmap::unordered_map<int, bool>;
+using map_type = hackmap::unordered_map<int, bool>;
 #else
 
 #ifdef UNORDERED_MAP
@@ -118,7 +118,7 @@ runtest(entry_t *e, int elen, int maxactions)
 {
     map_type m;
 
-#if DEBUG
+#ifdef DEBUG
     for (int eIndex = 0; eIndex < elen; ++eIndex)
     {
         e[eIndex].state = STATE_OUT;
@@ -133,7 +133,7 @@ runtest(entry_t *e, int elen, int maxactions)
         for (i = 0; i < elen; ++i)
         {
             entry_t *el = &e[i];
-#if !DEBUG
+#ifndef DEBUG
             switch (el->actions[action])
             {
                 case ACTION_HAS:

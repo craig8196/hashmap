@@ -8,6 +8,13 @@
 
 #include "hackmap.hpp"
 
+
+#ifdef DEBUG
+#define INVARIANT_CHECK (assert(map.invariant(&cout) && "Fail: invariant"));
+#else
+#define INVARIANT_CHECK
+#endif
+
 #ifndef FORCESEED
 #define FORCESEED (0)
 #endif
@@ -66,16 +73,16 @@ namespace hashit
     };
 }
 
-static constexpr int BLOCK_LEN = crj::detail::BLOCK_LEN;
+static constexpr int BLOCK_LEN = hackmap::detail::BLOCK_LEN;
 
-template class crj::detail::unordered_map<100, int, bool, hashit::edge_hash>;
-using map_edge_type = crj::detail::unordered_map<100, int, bool, hashit::edge_hash>;
+template class hackmap::detail::unordered_map<100, int, bool, hashit::edge_hash>;
+using map_edge_type = hackmap::detail::unordered_map<100, int, bool, hashit::edge_hash>;
 
-template class crj::unordered_map<int, bool>;
-using map_type = crj::unordered_map<int, bool>;
+template class hackmap::unordered_map<int, bool>;
+using map_type = hackmap::unordered_map<int, bool>;
 
-template class crj::detail::unordered_map<100, int, bool>;
-using map_full_type = crj::detail::unordered_map<100, int, bool>;
+template class hackmap::detail::unordered_map<100, int, bool>;
+using map_full_type = hackmap::detail::unordered_map<100, int, bool>;
 
 int
 main(void)
@@ -154,8 +161,8 @@ main(void)
             map.emplace(i, true);
             assert(1 == map.count(i) && "Fail: not in map");
         }
-        assert(map.size() == crj::detail::BLOCK_LEN && "Fail: wrong size");
-        assert(map.invariant(&cout) && "Fail: invariant");
+        assert(map.size() == hackmap::detail::BLOCK_LEN && "Fail: wrong size");
+        INVARIANT_CHECK
 
         cout << "PASSED SIMPLE LINEAR INSERTION TEST" << endl;
     }
@@ -164,7 +171,7 @@ main(void)
         // Test edge cases with insertion.
         map_edge_type map(0, hashit::edge_hash{});
 
-        assert(map.invariant(&cout) && "Fail: invariant");
+        INVARIANT_CHECK
 
         map.clear();
 
@@ -191,37 +198,37 @@ main(void)
         map.erase(5);
         map.emplace(b + 1, false);
         map.emplace(b + 2, false);
-        assert(map.invariant(&cout) && "Fail: invariant");
+        INVARIANT_CHECK
         // Force long leap.
         map.erase(500);
         map.emplace(b + 3, false);
-        assert(map.invariant(&cout) && "Fail: invariant");
+        INVARIANT_CHECK
         // Force wrap around.
         map.erase(0);
         map.emplace(b + 4, false);
-        assert(map.invariant(&cout) && "Fail: invariant");
+        INVARIANT_CHECK
         // Force insert into middle with extended leap.
         map.erase(100);
         map.emplace(b + 5, false);
-        assert(map.invariant(&cout) && "Fail: invariant");
+        INVARIANT_CHECK
         // Force insert into middle with normal leap.
         map.erase(b + 5);
         map.emplace(100, true);
-        assert(map.invariant(&cout) && "Fail: invariant");
+        INVARIANT_CHECK
         map.erase(400);
         map.emplace(b + 5, false);
-        assert(map.invariant(&cout) && "Fail: invariant");
+        INVARIANT_CHECK
         // Erase our head.
         map.erase(b + 1);
-        assert(map.invariant(&cout) && "Fail: invariant");
+        INVARIANT_CHECK
         // Erase element with large leap.
         map.erase(b + 5);
-        assert(map.invariant(&cout) && "Fail: invariant");
+        INVARIANT_CHECK
         // Erase remaining elements.
         map.erase(b + 4);
         map.erase(b + 2);
         map.erase(b + 3);
-        assert(map.invariant(&cout) && "Fail: invariant");
+        INVARIANT_CHECK
 
         // Clear data.
         map.clear();
@@ -252,13 +259,13 @@ main(void)
         map.erase(1000);
         map.insert({b + 2, false});
         map.insert({b + 3, false});
-        assert(map.invariant(&cout) && "Fail: invariant");
+        INVARIANT_CHECK
         map.erase(b + 1);
-        assert(map.invariant(&cout) && "Fail: invariant");
+        INVARIANT_CHECK
         map.erase(b + 3);
-        assert(map.invariant(&cout) && "Fail: invariant");
+        INVARIANT_CHECK
         map.erase(b + 2);
-        assert(map.invariant(&cout) && "Fail: invariant");
+        INVARIANT_CHECK
 
         // Reset data.
         map.reset();
@@ -279,7 +286,7 @@ main(void)
         map.insert({b + 3, false});
         map.insert({b + 4, false});
         map.erase(b + 1);
-        assert(map.invariant(&cout) && "Fail: invariant");
+        INVARIANT_CHECK
 
         // Reset data.
         map.reset();
@@ -300,7 +307,7 @@ main(void)
         map.insert({b + 2, false});
         map.insert({b + 3, false});
         map.insert({500, true});
-        assert(map.invariant(&cout) && "Fail: invariant");
+        INVARIANT_CHECK
         map.erase(500);
         map.erase(b + 2);
         map.erase(b + 3);
@@ -308,7 +315,7 @@ main(void)
         map.insert({b + 3, false});
         map.insert({b + 4, false});
         map.insert({600, true});
-        assert(map.invariant(&cout) && "Fail: invariant");
+        INVARIANT_CHECK
 
         // Equal range tests.
         using it_type = map_edge_type::iterator;
@@ -332,6 +339,17 @@ main(void)
         map.emplace(0, true);
         map.emplace(1, true);
 
+        // Test operator[]
+        map[0] = false; // true from above
+        const int key = 1;
+        map[key] = false;
+        assert(!map[0] && !map[key] && "Fail: set test");
+
+        cout << "PASSED BASIC EDGE CASE TEST" << endl;
+    }
+
+    {
+        // Test less used features and functions.
         // Swap
         map_edge_type map1;
         map_edge_type map2;
@@ -352,14 +370,20 @@ main(void)
         assert(1 == map1.count(1) && "Fail: self swap");
         assert(0 == map2.size() && "Fail: self swap");
         assert(0 == map2.count(1) && "Fail: self swap");
-        
-        // Test operator[]
-        map[0] = false; // true from above
-        const int key = 1;
-        map[key] = false;
-        assert(!map[0] && !map[key] && "Fail: set test");
 
-        cout << "PASSED BASIC EDGE CASE TEST" << endl;
+        // For coverage.
+        map_type m;
+        m.get_allocator();
+
+        const map_type::value_type p = { 24, false };
+        m.insert(p);
+        m.insert(m.cbegin(), p);
+        m.insert({ { 22, true }, { 15, false } });
+        m.load_factor();
+        m.max_bucket_count();
+        m.max_load_factor();
+        
+        cout << "PASSED SWAP AND LESSER USED FEATURES TEST" << endl;
     }
 
     {
@@ -419,7 +443,6 @@ main(void)
 
     {
         // Test constructors.
-
         map_edge_type m1({
             {1, true},
             {2, true},
@@ -487,7 +510,7 @@ main(void)
             assert(1 == map.count(i) && "Fail: contains");
         }
 
-        assert(map.invariant(&cout) && "Fail: invariant");
+        INVARIANT_CHECK
 
         for (i = 0; i < max; ++i)
         {
@@ -495,7 +518,7 @@ main(void)
             assert(0 == map.count(i) && "Fail: not contains");
         }
 
-        assert(map.invariant(&cout) && "Fail: invariant");
+        INVARIANT_CHECK
 
         cout << "PASSED LARGER LINEAR TEST" << endl;
     }
@@ -516,7 +539,7 @@ main(void)
             assert(1 == map.count(val) && "Fail: contains");
         }
 
-        assert(map.invariant(&cout) && "Fail: invariant");
+        INVARIANT_CHECK
 
         for (i = 0; i < max; ++i)
         {
@@ -525,7 +548,7 @@ main(void)
             assert(0 == map.count(val) && "Fail: not contains");
         }
 
-        assert(map.invariant(&cout) && "Fail: invariant");
+        INVARIANT_CHECK
 
         cout << "PASSED LARGER LINEAR MULTIPLE OF 8 TEST" << endl;
     }
@@ -560,7 +583,7 @@ main(void)
             assert(size == map.size() && "Fail: size");
         }
 
-        assert(map.invariant() && "Fail: invariant");
+        INVARIANT_CHECK
 
         for (i = 0; i < len; ++i)
         {
@@ -569,7 +592,7 @@ main(void)
             assert(0 == map.erase(k) && "Fail: erase nonexist");
         }
 
-        assert(map.invariant() && "Fail: invariant");
+        INVARIANT_CHECK
 
         rand_intarr_free(n);
 
