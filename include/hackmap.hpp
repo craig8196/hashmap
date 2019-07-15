@@ -742,7 +742,6 @@ public:
         return block->get_value(index).second;
     }
 
-#if 0
     const mapped_type&
     at(const key_type& k)
     const
@@ -755,7 +754,6 @@ public:
         auto block = get_block(index);
         return block->get_value(index).second;
     }
-#endif
 
     iterator
     begin()
@@ -764,14 +762,12 @@ public:
         return iterator{ mBlock, 0, IteratorLeap{} };
     }
 
-#if 0
     const_iterator
     begin()
     const noexcept
     {
         return cbegin();
     }
-#endif
 
     size_type
     bucket(const key_type& k)
@@ -858,16 +854,13 @@ public:
         return iterator{ mBlock, mLen };
     }
 
-#if 0
     const_iterator
     end()
     const noexcept
     {
         return cend();
     }
-#endif
 
-#if 0
     std::pair<iterator, iterator>
     equal_range(const key_type& k)
     {
@@ -882,7 +875,6 @@ public:
             return { end(), end() };
         }
     }
-#endif
 
     std::pair<const_iterator, const_iterator>
     equal_range(const key_type& k)
@@ -994,7 +986,6 @@ public:
         return iterator{ mBlock, index };
     }
 
-#if 0
     const_iterator
     find(const key_type& k)
     const
@@ -1002,7 +993,6 @@ public:
         const size_type index = find_index(k);
         return const_iterator{ mBlock, index };
     }
-#endif
 
     allocator_type
     get_allocator()
@@ -1546,7 +1536,6 @@ private:
         size_type ihead = hash_to_index(hash);
         auto block = get_block(ihead);
 
-#if 1
         if (block->is_empty_or_link(ihead))
         {
             return mLen;
@@ -1561,28 +1550,6 @@ private:
                 return ihead;
             }
         }
-#else
-        if (block->is_empty(ihead))
-        {
-            return mLen;
-        }
-
-        uint8_t frag = hash_fragment(hash);
-
-        if (frag == block->get_hash(ihead))
-        {
-            if (compare_keys(block->get_value(ihead).first, k))
-            {
-                return ihead;
-            }
-        }
-
-        // Combined into the empty check.
-        if (UNLIKELY(block->is_link(ihead)))
-        {
-            return mLen;
-        }
-#endif
 
         if (block->is_end(ihead))
         {
@@ -1967,25 +1934,11 @@ private:
         for (;;)
         {
 
-#if 1
             if (block->is_local(inext))
             {
                 // If we are at the end or next entry isn't search, we're done.
                 break;
             }
-#else
-            if (block->is_end(inext))
-            {
-                // If the next entry is the end, we're done.
-                break;
-            }
-
-            if (block->is_local(inext))
-            {
-                // If the next entry isn't a search, we're done.
-                break;
-            }
-#endif
             
             // Perform the search BEFORE we change the search hash.
             size_type ifrom = (inext + block->get_leap(inext)) & mMask;
@@ -2030,16 +1983,6 @@ private:
     {
         return hasher::operator()(kv.first);
     }
-
-#if 0
-    // TODO Needed?
-    size_type
-    hash_key(const value_type& kv)
-    const
-    {
-        return hasher::operator()(kv.first);
-    }
-#endif
 
     template <typename HashKey>
     size_type
@@ -2146,11 +2089,6 @@ private:
         findhash = block_type::set_link_hash(findhash);
 
         // Iterate through every slot in the table starting at the leap point.
-#if 0
-        size_type i = 0;
-        for (; i < mLen; ++i)
-#endif
-
         for (;;)
         {
             auto block = get_block(ifrom);
@@ -2172,9 +2110,6 @@ private:
 
             ifrom = (ifrom + BLOCK_LEN) & mMask;
         }
-#if 0
-        return 0;
-#endif
     }
 
     /** @return True if we need to grow; false otherwise. */
@@ -2286,16 +2221,6 @@ private:
         {
             mSize = 0;
             insert_move_from(oldBlock, oldLen);
-#if 0
-            iterator start{ oldBlock, 0, IteratorLeap{} };
-            const_iterator stop{ oldBlock, oldLen };
-
-            while (start != stop)
-            {
-                upsert<false, true, false>(std::move(*start));
-                ++start;
-            }
-#endif
         }
 
         deallocate_blocks(oldBlock, oldLen);
@@ -2383,23 +2308,6 @@ private:
 
 } /* namespace detail */
 
-#if 0
-template <typename Key,
-          typename T,
-          typename Hash = fibonacci_hash<Key>,
-          typename Pred = std::equal_to<Key>,
-          typename Alloc = std::allocator<std::pair<Key, T> >
-          >
-using unordered_map =
-    detail::unordered_map<99,
-                          Key,
-                          T,
-                          Hash,
-                          Pred,
-                          typename std::allocator_traits<Alloc>::template
-                          rebind_alloc<unsigned char>
-                          >;
-#endif
 template <typename Key,
           typename T,
           typename Hash = fibonacci_hash<Key>,

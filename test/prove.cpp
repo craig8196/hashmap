@@ -382,6 +382,15 @@ main(void)
         m.load_factor();
         m.max_bucket_count();
         m.max_load_factor();
+
+        // Const coverage.
+        const map_edge_type mapconst = { { 0, true } };
+        mapconst.begin();
+        mapconst.end();
+        mapconst.equal_range(0);
+        mapconst.equal_range(1);
+        mapconst.find(0);
+        mapconst.find(1);
         
         cout << "PASSED SWAP AND LESSER USED FEATURES TEST" << endl;
     }
@@ -416,6 +425,19 @@ main(void)
         try
         {
             map.at(BLOCK_LEN + 4);
+            assert(false && "Fail: out of range");
+        }
+        catch (std::out_of_range& e)
+        {
+            assert(true && "Fail: out of range");
+        }
+
+        const map_edge_type map2 = { { 0, true } };
+
+        assert(map2.at(0) && "Failed: at");
+        try
+        {
+            map2.at(BLOCK_LEN + 4);
             assert(false && "Fail: out of range");
         }
         catch (std::out_of_range& e)

@@ -151,5 +151,5 @@ endif
 
 .PHONY: clean
 clean:
-	@rm -rf $(ODIR) $(LDIR) $(TDIR)/*.o out/ gmon.out *.txt *.info *.gcda *.gcno Coverage.* && echo "CLEANED!" || echo "FAILED TO CLEANUP!"
+	@rm -rf $(ODIR) $(LDIR) $(TDIR)/*.o out/ doc/ gmon.out *.txt *.info *.gcda *.gcno Coverage.* && echo "CLEANED!" || echo "FAILED TO CLEANUP!"
 
