@@ -11,18 +11,32 @@
 
 #ifdef UNORDERED_MAP
 #include <unordered_map>
+using map_type = std::unordered_map<int, bool>;
 #endif
 
 #ifdef BYTELL_HASH_MAP
 #include "bytell_hash_map.hpp"
+using map_type = ska::bytell_hash_map<int, bool>;
+#endif
+
+#ifdef HACKMAP
+#include "hackmap.hpp"
+using map_type = hackmap::unordered_map<int, bool>;
 #endif
 
 #ifdef FLAT_HASH_MAP
 #include "flat_hash_map.hpp"
+using map_type = ska::flat_hash_map<int, bool>;
 #endif
 
 #ifdef UNORDERED_MAP_FIB
 #include "unordered_map.hpp"
+using map_type = ska::unordered_map<int, bool>;
+#endif
+
+#ifdef ROBINHOOD
+#include "robin_hood.hpp"
+using map_type = robin_hood::unordered_map<int, bool>;
 #endif
 
 
@@ -66,27 +80,8 @@ main(void)
 #ifdef ALLOW_RESERVE
             hashmap_reserve(&map, i);
 #endif
-#endif
-#ifdef UNORDERED_MAP
-            std::unordered_map<int, bool> u;
-#ifdef ALLOW_RESERVE
-            u.reserve(i);
-#endif
-#endif
-#ifdef BYTELL_HASH_MAP
-            ska::bytell_hash_map<int, bool> u;
-#ifdef ALLOW_RESERVE
-            u.reserve(i);
-#endif
-#endif
-#ifdef FLAT_HASH_MAP
-            ska::flat_hash_map<int, bool> u;
-#ifdef ALLOW_RESERVE
-            u.reserve(i);
-#endif
-#endif
-#ifdef UNORDERED_MAP_FIB
-            ska::unordered_map<int, bool> u;
+#else
+            map_type u;
 #ifdef ALLOW_RESERVE
             u.reserve(i);
 #endif
@@ -98,34 +93,13 @@ main(void)
             {
 #ifdef HASHMAP
                 hashmap_insert(&map, &nums[k], &bval);
-#endif
-#ifdef UNORDERED_MAP
-                u.insert({ nums[k], true });
-#endif
-#ifdef BYTELL_HASH_MAP
-                u.insert({ nums[k], true });
-#endif
-#ifdef FLAT_HASH_MAP
-                u.insert({ nums[k], true });
-#endif
-#ifdef UNORDERED_MAP_FIB
+#else
                 u.insert({ nums[k], true });
 #endif
             }
+
 #ifdef HASHMAP
             hashmap_destroy(&map);
-#endif
-#ifdef UNORDERED_MAP
-            // Auto cleanup
-#endif
-#ifdef BYTELL_HASH_MAP
-            // Auto cleanup
-#endif
-#ifdef FLAT_HASH_MAP
-            // Auto cleanup
-#endif
-#ifdef UNORDERED_MAP_FIB
-            // Auto cleanup
 #endif
         }
 
