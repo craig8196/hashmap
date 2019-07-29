@@ -236,11 +236,23 @@ public:
 
     static void
     fill_sentinel(unsigned char *p)
-    { std::memset(p, SENTINEL, BLOCK_LEN); }
+    {
+#if 1
+        p[0] = SENTINEL;
+#else
+        std::memset(p, SENTINEL, BLOCK_LEN);
+#endif
+    }
 
     static size_type
     sentinel_memory_size()
-    { return BLOCK_LEN; }
+    {
+#if 1
+        return 1;
+#else
+        return BLOCK_LEN;
+#endif
+    }
 
     static size_type
     construct_index(size_type i, int sub)
@@ -915,7 +927,7 @@ public:
 
         if (frag == block->get_hash(ihead))
         {
-            if (compare_keys(block->get_value(ihead).first, k))
+            if (LIKELY(compare_keys(block->get_value(ihead).first, k)))
             {
                 allocator_traits::destroy(*this, block->get_value_ptr(ihead));
                 if (LIKELY(block->is_end(ihead)))
@@ -947,7 +959,7 @@ public:
 
             if (frag == block->get_hash(index) || notrust)
             {
-                if (compare_keys(block->get_value(index).first, k))
+                if (LIKELY(compare_keys(block->get_value(index).first, k)))
                 {
                     unlink(ihead, iprev, index);
                     block->set_empty(index);
@@ -1678,13 +1690,13 @@ private:
                     }
                 }
 
-                if (LIKELY(IsListInsert || block->is_head(ihead)))
+                if (IsListInsert || LIKELY(block->is_head(ihead)))
                 {
                     do
                     {
                         if (!IsUnique && (frag == block->get_hash(index)))
                         {
-                            if (compare_keys(block->get_value(index).first, k))
+                            if (LIKELY(compare_keys(block->get_value(index).first, k)))
                             {
                                 if (DoUpsert)
                                 {
@@ -1718,8 +1730,9 @@ private:
                                 && (frag == block->get_hash(index)
                                     || notrust))
                             {
-                                if (compare_keys(block->get_value(index).first,
-                                                 k))
+                                if (LIKELY(compare_keys(
+                                                block->get_value(index).first,
+                                                k)))
                                 {
                                     if (DoUpsert)
                                     {
@@ -1776,11 +1789,22 @@ private:
     find_empty(size_type itail)
     const noexcept
     {
+        ++itail; // Actually, we can just start after the tail.
+
         auto block = get_block(itail);
+
+#if 0
+        // No apparent speedup.
+        if (UNLIKELY(block->is_empty(itail)))
+        {
+            return itail;
+        }
+#endif
+
         int isub;
 
         search_map map = block->find_empty(itail);
-        if (LIKELY(map.has()))
+        if (map.has())
         {
             isub = map.next();
             return combine_index(itail, isub);
