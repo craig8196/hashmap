@@ -1789,7 +1789,7 @@ private:
     find_empty(size_type itail)
     const noexcept
     {
-        ++itail; // Actually, we can just start after the tail.
+        itail = (itail + 1) & mMask; // Actually, we can just start after the tail.
 
         auto block = get_block(itail);
 
