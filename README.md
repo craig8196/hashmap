@@ -28,10 +28,7 @@ Otherwise the map won't function as efficiently.
 ### Contributing
 Add your name somewhere and submit a pull request :)
 The following are additional items that can be worked on:
-* [ ] Peer review
 * [ ] Optimizations
-* [ ] Badges (everybody seems to have them)
-* [ ] Documentation
 * [ ] Statistics and performance reports
 
 ## Inspiration
@@ -67,8 +64,8 @@ reasonable data.
 * Two (2) octets of overhead per entry.
     * First octet is 6 bits of hash, EMPTY value, and head/link bit.
     * Second octet is for chaining, highest value indicates a slower search.
-* Densely packed table (load factor of 0.99 default).
-* Dense table should mitigate extra memory uses.
+* Densely packed table (load factor of 0.97 default).
+* Dense table should mitigate extra memory use (extra byte per entry overhead).
 * Addition of sentinel byte(s) at end for iterators.
 
 ## Fibonacci Hashing
@@ -90,7 +87,7 @@ uint32_t newhash = gap_prime * original_hash
 ```
 
 ## Notes
-* I found that my first implementations were slow because I was storing
+* I found that my initial implementations were slow because I was storing
   too much information (full hash? unnecessary).
   Using too much space drastically decreases performance since you
   start to thrash your cache.
@@ -104,8 +101,10 @@ uint32_t newhash = gap_prime * original_hash
   Chaining should be a more effective method for collision resolution,
   up to one (1) relocation per insertion which is better than the cascades
   that can occur with Robinhood when the table is more full.
+  Robinhood algorithm requires an excellent hash function to prevent 
+  performance issues.
 * From other people's experimentation and research there is possibly
-  larger cost with calling the equality function.
+  larger cost with calling the equality/predicate function.
   Thus, part of the hash is kept for a quick lint check.
   Originally I tried storing the full hash, but this is a waste of space.
 * When hash tables get large they stop being in cache.
@@ -122,7 +121,7 @@ uint32_t newhash = gap_prime * original_hash
   good.
   However, the gaps and flaws in performance became more evident on an AMD
   machine.
-  Perhaps Intel has better pipelining or caching, which could hide some defects.
+  Perhaps Intel has better pipelining/caching, which could hide some defects.
 
 ## Implementation and Algorithm
 * The table is power of two number of blocks.
@@ -131,7 +130,7 @@ uint32_t newhash = gap_prime * original_hash
 * Each block has array of hashes where 6 bits of hash, 1 bit for head/link,
   or EMPTY are stored.
 * Each block has array of leaps where 8 bits are used to describe linked list.
-* Each block has a entry to store keys/values.
+* Each block has array to store values.
 
 ### First Step
 Compute the hash of the key and create index.
@@ -223,7 +222,7 @@ make all ops=3 # Will set flag -O3
 
 Run test:
 ```bash
-make test target=prove # Name of test file is prove.cpp
+make test target=prove stats=true
 # target=prove is optional (set by default)
 ```
 
