@@ -71,11 +71,171 @@ using size_type = std::size_t;
 
 class unordered_map_stats
 {
-public:
-    std::vector<size_type> distances;
-    size_type extended_leaps;
+    static constexpr size_type LEN = 32;
+private:
+    size_type mLen;
+    size_type mSize;
+    size_type mEmpty;
+    size_type mRun;
+    size_type mRunMax;
+    size_type mRunCount;
+    size_type mRunTotal;
+    std::vector<size_type> mLinkDistances;
+    std::vector<size_type> mLeapDistancesCount;
+    std::vector<size_type> mLeapDistancesTotal;
+    std::vector<size_type> mHomeDistancesCount;
+    std::vector<size_type> mHomeDistancesTotal;
 
-    unordered_map_stats() = default;
+public:
+    unordered_map_stats()
+        : mLinkDistances(LEN, 0)
+        , mLeapDistancesCount(LEN, 0)
+        , mLeapDistancesTotal(LEN, 0)
+        , mHomeDistancesCount(LEN, 0)
+        , mHomeDistancesTotal(LEN, 0)
+    {}
+
+    void
+    start(size_type len, size_type size)
+    {
+        mLen = len;
+        mSize = size;
+        mEmpty = len - size;
+        mRun = 0;
+        mRunMax = 0;
+        mRunCount = 0;
+        mRunTotal = 0;
+        mLinkDistances.clear();
+        mLeapDistancesCount.clear();
+        mLeapDistancesTotal.clear();
+        mHomeDistancesCount.clear();
+        mHomeDistancesTotal.clear();
+    }
+
+    void
+    is_next_empty(bool it_is_empty)
+    {
+        if (it_is_empty)
+        {
+            flush_run();
+        }
+        else
+        {
+            ++mRun;
+        }
+    }
+
+    void
+    link_distance(size_type link_index)
+    {
+        if (link_index < LEN)
+        {
+            mLinkDistances[link_index]++;
+        }
+    }
+
+    void
+    leap_distance(size_type link_index, size_type dist)
+    {
+        if (link_index < LEN)
+        {
+            mLeapDistancesCount[link_index]++;
+            mLeapDistancesTotal[link_index] += dist;
+        }
+    }
+
+    void
+    home_distance(size_type link_index, size_type dist)
+    {
+        if (link_index < LEN)
+        {
+            mHomeDistancesCount[link_index]++;
+            mHomeDistancesTotal[link_index] += dist;
+        }
+    }
+
+    void
+    stop()
+    {
+        flush_run();
+    }
+
+    void
+    print()
+    {
+        print(std::cout);
+    }
+
+    void
+    print(std::ostream &os)
+    {
+        if (mSize && mLen)
+        {
+            os << "Max Elements: " << mLen << std::endl;
+            os << "Size: " << mSize << std::endl;
+            os << "Full: " << (double(mSize)/double(mLen)) * 100.0 << "%" << std::endl;
+            os << "Empty: " << (double(mEmpty)/double(mLen)) * 100.0 << "%" << std::endl;
+
+            if (mRunMax)
+            {
+                os << "Run Max: " << mRunMax << std::endl;
+            }
+
+            if (mRunCount)
+            {
+                os << "Run Avg: " << (double(mRunTotal)/double(mRunCount)) << std::endl;
+            }
+
+            for (size_type i = 0; i < LEN; ++i)
+            {
+                size_type linkdist = mLinkDistances[i];
+                if (linkdist)
+                {
+                    os << "Link " << i << ": " << (double(linkdist)/double(mSize)) * 100.0 << "%" << std::endl;
+                }
+            }
+
+            for (size_type i = 0; i < LEN; ++i)
+            {
+                size_type leapcount = mLeapDistancesCount[i];
+                if (leapcount)
+                {
+                    size_type leapdist = mLeapDistancesTotal[i];
+                    os << "Leap " << i << ": " << (double(leapdist)/double(leapcount)) << std::endl;
+                }
+            }
+
+            for (size_type i = 0; i < LEN; ++i)
+            {
+                size_type homecount = mHomeDistancesCount[i];
+                if (homecount)
+                {
+                    size_type homedist = mHomeDistancesTotal[i];
+                    os << "Home " << i << ": " << (double(homedist)/double(homecount)) << std::endl;
+                }
+            }
+        }
+        else
+        {
+            os << "Map is empty." << std::endl;
+        }
+    }
+
+private:
+    void
+    flush_run()
+    {
+        if (mRun)
+        {
+            if (mRun > mRunMax)
+            {
+                mRunMax = mRun;
+            }
+            mRunCount++;
+            mRunTotal += mRun;
+            mRun = 0;
+        }
+    }
 };
 
 template <typename Key, typename Hash = std::hash<Key>>
@@ -593,12 +753,13 @@ public:
         block_type* mBlock;
         size_type   mIndex;
 
-        void
+        INLINE void
         leap_if_empty()
         {
             auto block = block_type::get(mBlock, mIndex);
             if (block->is_empty(mIndex))
             {
+#if 1
                 search_map map = block->find_full(mIndex);
                 while (!map.has())
                 {
@@ -607,6 +768,27 @@ public:
                     map = block->find_full();
                 }
                 mIndex = block_type::construct_index(mIndex, map.next());
+#else
+                switch (block_type::get_subindex(mIndex))
+                {
+                    case 0:
+                    case 1:
+                    case 2:
+                    case 3:
+                    case 4:
+                    case 5:
+                    case 6:
+                    case 7:
+                    case 8:
+                    case 9:
+                    case 10:
+                    case 11:
+                    case 12:
+                    case 13:
+                    case 14:
+                    case 15:
+                }
+#endif
             }
         }
 
@@ -1538,6 +1720,65 @@ public:
     }
 #endif
 
+    void
+    gather_stats_list(unordered_map_stats &stats, size_type ihead)
+    const noexcept
+    {
+        size_type iprev = ihead;
+        size_type index = ihead;
+        size_type list_index = 0;
+
+        bool notrust = false;
+        for (;;)
+        {
+            stats.link_distance(list_index);
+
+            if (list_index)
+            {
+                size_type leap_dist = ((index + mLen) - iprev) & mMask;
+                size_type home_dist = ((index + mLen) - ihead) & mMask;
+                stats.leap_distance(list_index, leap_dist);
+                stats.home_distance(list_index, home_dist);
+            }
+
+            auto block = get_block(index);
+
+            if (block->is_end(index))
+            {
+                break;
+            }
+
+            iprev = index;
+            index = leap(ihead, index, notrust);
+            ++list_index;
+        }
+    }
+
+    void
+    gather_stats(unordered_map_stats &stats)
+    const noexcept
+    {
+        if (mSize)
+        {
+            stats.start(mLen, mSize);
+            for (size_type index = 0; index < mLen; ++index)
+            {
+                auto block = get_block(index);
+
+                if (block->is_empty(index))
+                {
+                    stats.is_next_empty(true);
+                }
+                else if (block->is_head(index))
+                {
+                    stats.is_next_empty(false);
+                    gather_stats_list(stats, index);
+                }
+            }
+            stats.stop();
+        }
+    }
+
 private:
     template <typename FindKey>
     size_type
@@ -1828,7 +2069,8 @@ private:
     link_empty(size_type ihead, size_type itail, uint8_t& frag)
     noexcept
     {
-        size_type iempty = find_empty(itail);
+        //size_type iempty = find_empty(itail);
+        size_type iempty = find_empty(ihead);
         size_type emptyPos = ((iempty + mLen) - ihead) & mMask;
         size_type nextPos = ((itail + mLen) - ihead) & mMask;
 

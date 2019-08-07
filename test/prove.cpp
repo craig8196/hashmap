@@ -10,9 +10,15 @@
 
 
 #ifdef DEBUG
-#define INVARIANT_CHECK (assert(map.invariant(&cout) && "Fail: invariant"));
+#define INVARIANT_CHECK {assert(map.invariant(&cout) && "Fail: invariant")};
 #else
 #define INVARIANT_CHECK
+#endif
+
+#ifdef STATS
+#define STATS_DUMP(m, s) {(m).gather_stats((s));(s).print();}
+#else
+#define STATS_DUMP(m, s)
 #endif
 
 #ifndef FORCESEED
@@ -83,6 +89,8 @@ using map_type = hackmap::unordered_map<int, bool>;
 
 template class hackmap::detail::unordered_map<100, int, bool>;
 using map_full_type = hackmap::detail::unordered_map<100, int, bool>;
+
+using stats_type = hackmap::unordered_map_stats;
 
 int
 main(void)
@@ -162,7 +170,7 @@ main(void)
             assert(1 == map.count(i) && "Fail: not in map");
         }
         assert(map.size() == hackmap::detail::BLOCK_LEN && "Fail: wrong size");
-        INVARIANT_CHECK
+        INVARIANT_CHECK;
 
         cout << "PASSED SIMPLE LINEAR INSERTION TEST" << endl;
     }
@@ -171,7 +179,7 @@ main(void)
         // Test edge cases with insertion.
         map_edge_type map(0, hashit::edge_hash{});
 
-        INVARIANT_CHECK
+        INVARIANT_CHECK;
 
         map.clear();
 
@@ -198,37 +206,37 @@ main(void)
         map.erase(5);
         map.emplace(b + 1, false);
         map.emplace(b + 2, false);
-        INVARIANT_CHECK
+        INVARIANT_CHECK;
         // Force long leap.
         map.erase(500);
         map.emplace(b + 3, false);
-        INVARIANT_CHECK
+        INVARIANT_CHECK;
         // Force wrap around.
         map.erase(0);
         map.emplace(b + 4, false);
-        INVARIANT_CHECK
+        INVARIANT_CHECK;
         // Force insert into middle with extended leap.
         map.erase(100);
         map.emplace(b + 5, false);
-        INVARIANT_CHECK
+        INVARIANT_CHECK;
         // Force insert into middle with normal leap.
         map.erase(b + 5);
         map.emplace(100, true);
-        INVARIANT_CHECK
+        INVARIANT_CHECK;
         map.erase(400);
         map.emplace(b + 5, false);
-        INVARIANT_CHECK
+        INVARIANT_CHECK;
         // Erase our head.
         map.erase(b + 1);
-        INVARIANT_CHECK
+        INVARIANT_CHECK;
         // Erase element with large leap.
         map.erase(b + 5);
-        INVARIANT_CHECK
+        INVARIANT_CHECK;
         // Erase remaining elements.
         map.erase(b + 4);
         map.erase(b + 2);
         map.erase(b + 3);
-        INVARIANT_CHECK
+        INVARIANT_CHECK;
 
         // Clear data.
         map.clear();
@@ -259,13 +267,13 @@ main(void)
         map.erase(1000);
         map.insert({b + 2, false});
         map.insert({b + 3, false});
-        INVARIANT_CHECK
+        INVARIANT_CHECK;
         map.erase(b + 1);
-        INVARIANT_CHECK
+        INVARIANT_CHECK;
         map.erase(b + 3);
-        INVARIANT_CHECK
+        INVARIANT_CHECK;
         map.erase(b + 2);
-        INVARIANT_CHECK
+        INVARIANT_CHECK;
 
         // Reset data.
         map.reset();
@@ -286,7 +294,7 @@ main(void)
         map.insert({b + 3, false});
         map.insert({b + 4, false});
         map.erase(b + 1);
-        INVARIANT_CHECK
+        INVARIANT_CHECK;
 
         // Reset data.
         map.reset();
@@ -307,7 +315,7 @@ main(void)
         map.insert({b + 2, false});
         map.insert({b + 3, false});
         map.insert({500, true});
-        INVARIANT_CHECK
+        INVARIANT_CHECK;
         map.erase(500);
         map.erase(b + 2);
         map.erase(b + 3);
@@ -315,7 +323,7 @@ main(void)
         map.insert({b + 3, false});
         map.insert({b + 4, false});
         map.insert({600, true});
-        INVARIANT_CHECK
+        INVARIANT_CHECK;
 
         // Equal range tests.
         using it_type = map_edge_type::iterator;
@@ -522,6 +530,7 @@ main(void)
     {
         // Larger linear test.
         map_type map;
+        stats_type stats;
 
         int max = 10000;
         int i;
@@ -532,7 +541,8 @@ main(void)
             assert(1 == map.count(i) && "Fail: contains");
         }
 
-        INVARIANT_CHECK
+        INVARIANT_CHECK;
+        STATS_DUMP(map, stats);
 
         for (i = 0; i < max; ++i)
         {
@@ -540,7 +550,7 @@ main(void)
             assert(0 == map.count(i) && "Fail: not contains");
         }
 
-        INVARIANT_CHECK
+        INVARIANT_CHECK;
 
         cout << "PASSED LARGER LINEAR TEST" << endl;
     }
@@ -548,6 +558,7 @@ main(void)
     {
         // Larger linear multiple of 8 test.
         map_type map;
+        stats_type stats;
 
         map.reserve(1024);
 
@@ -561,7 +572,9 @@ main(void)
             assert(1 == map.count(val) && "Fail: contains");
         }
 
-        INVARIANT_CHECK
+        INVARIANT_CHECK;
+
+        STATS_DUMP(map, stats);
 
         for (i = 0; i < max; ++i)
         {
@@ -570,7 +583,7 @@ main(void)
             assert(0 == map.count(val) && "Fail: not contains");
         }
 
-        INVARIANT_CHECK
+        INVARIANT_CHECK;
 
         cout << "PASSED LARGER LINEAR MULTIPLE OF 8 TEST" << endl;
     }
@@ -578,6 +591,7 @@ main(void)
     {
         // Simple random number insertions.
         map_type map;
+        stats_type stats;
 
         // Generate numbers.
         const int len = 10000;
@@ -605,7 +619,9 @@ main(void)
             assert(size == map.size() && "Fail: size");
         }
 
-        INVARIANT_CHECK
+        INVARIANT_CHECK;
+
+        STATS_DUMP(map, stats);
 
         for (i = 0; i < len; ++i)
         {
@@ -614,7 +630,7 @@ main(void)
             assert(0 == map.erase(k) && "Fail: erase nonexist");
         }
 
-        INVARIANT_CHECK
+        INVARIANT_CHECK;
 
         rand_intarr_free(n);
 
@@ -654,20 +670,12 @@ main(void)
 
         cout << "DONE CREATING RANDOM NUMBERS" << endl;
 
-        // Start timer.
-        struct timespec start;
-        struct timespec end;
-
-        if (clock_gettime(CLOCK_REALTIME, &start))
-        {
-            printf("Error getting start time: %d, %s\n", errno, strerror(errno));
-            return errno;
-        }
-
         // Start the test.
         for (int iterCount = 0; iterCount < maxiter; ++iterCount)
         {
             map_full_type m;
+            stats_type stats;
+
             entry_t *elements = e + iterCount;
             size_t size = 0;
             for (int action = 0; action < maxactions; ++action)
@@ -727,6 +735,11 @@ main(void)
                     }
                 }
             }
+                
+            if (0 == iterCount)
+            {
+                STATS_DUMP(m, stats);
+            }
             
             // Reset state for next round.
             for (int eIndex = 0; eIndex < maxlen; ++eIndex)
@@ -734,27 +747,6 @@ main(void)
                 elements[eIndex].state = STATE_OUT;
             }
         }
-
-        if (clock_gettime(CLOCK_REALTIME, &end))
-        {
-            printf("Error getting end time: %d, %s\n", errno, strerror(errno));
-            return errno;
-        }
-
-        double seconds =
-            (double)(end.tv_sec - start.tv_sec) 
-            + ((double)end.tv_nsec - (double)start.tv_nsec)/1000000000.0;
-
-        int runops = maxlen * maxactions;
-        int totalops = runops * maxiter;
-        printf(
-            "Stat: [%d] items [%d] times in "
-            "[%f] seconds or [%f per second/%f nsec per op]\n",
-            runops,
-            maxiter,
-            seconds,
-            ((double)totalops/seconds),
-            (seconds*1000000000.0)/(double)totalops);
 
         free(e);
 
