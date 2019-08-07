@@ -10,12 +10,12 @@ ODIR = ./obj
 LDIR = ./lib
 
 PROF = 
-ifdef prof
-ifeq ($(prof), coverage)
+ifdef profile
+ifeq ($(profile), coverage)
 PROF += -fprofile-arcs -ftest-coverage --coverage \
 		-fno-inline -fno-inline-small-functions -fno-default-inline
 endif
-ifeq ($(prof), gprof)
+ifeq ($(profile), gprof)
 PROF += -pg
 endif
 endif
@@ -27,7 +27,7 @@ ifneq ($(strip $(op_level)),)
 endif
 endif
 
-ifdef prof
+ifdef profile
 # Additional inlining prevention.
 	OPTIMIZE = -O0
 endif
@@ -59,6 +59,10 @@ endif
 
 ifdef verbose
 DEFINES += -DVERBOSE
+endif
+
+ifdef stats
+DEFINES += -DSTATS
 endif
 
 ifdef reserve
@@ -132,19 +136,19 @@ doc:
 test: $(OBJS) $(UTILOBJ)
 	$(CC) $(CFLAGS) $(IFLAGS) $(DEFINES) $(LIBS) $^ $(TDIR)/$(TESTFILE).$(EXT) -o $(TDIR)/$(TESTFILE).o
 	@echo "START TEST: $(TESTFILE)"
-ifdef prof
-ifeq ($(prof), coverage)
+ifdef profile
+ifeq ($(profile), coverage)
 	@lcov -c -i -b . -d . -o Coverage.baseline
 endif
 endif
 	@$(TDIR)/$(TESTFILE).o && echo "PASSED" || echo "FAILED"
-ifdef prof
-ifeq ($(prof), coverage)
+ifdef profile
+ifeq ($(profile), coverage)
 	@lcov -c -b . -d . -o Coverage.out
 	@lcov -a Coverage.baseline -a Coverage.out -o Coverage.combined
 	@genhtml Coverage.combined --output-directory out
 endif
-ifeq ($(prof), gprof)
+ifeq ($(profile), gprof)
 	gprof $(TDIR)/$(TESTFILE).o gmon.out > analysis.txt
 endif
 endif
