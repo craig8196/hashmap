@@ -801,6 +801,7 @@ public:
     };
 
 private:
+    // TODO the maximum possible size may be much smaller than this due to use of doubles in loadfactor calculations
     static constexpr size_type MAX_SIZE =
         size_type(1) << ((sizeof(size_type) * 8) - 2);
     block_type* mBlock      = reinterpret_cast<block_type*>(&NULL_BLOCK);
@@ -2429,6 +2430,7 @@ private:
         return p;
     }
 
+    template <bool IsMostlyFull>
     void
     insert_move_from(block_type* b, size_type len)
     {
@@ -2437,13 +2439,32 @@ private:
         for (size_type i = 0; i < blen; ++i)
         {
             block_type* block = b + i;
-            search_map m = block->find_full();
-            while (m.has())
+
+            if (IsMostlyFull)
             {
-                int sub = m.next();
-                upsert<false, true, false>(
-                    std::move(block->get_value_by_subindex(sub)));
-                m.clear(sub);
+                // Gets us 1-2 nanoseconds off on map growth.
+                // Probably due to loop unrolling.
+                for (int sub = 0; sub < BLOCK_LEN; ++sub)
+                {
+                    if (LIKELY(!block->is_empty_by_subindex(sub)))
+                    {
+                        upsert<false, true, false>(
+                            std::move(block->get_value_by_subindex(sub)));
+                    }
+                }
+            }
+            else
+            {
+                // Not performance tested yet, but should give better
+                // performance when shrinking the map.
+                search_map m = block->find_full();
+                while (m.has())
+                {
+                    int sub = m.next();
+                    upsert<false, true, false>(
+                        std::move(block->get_value_by_subindex(sub)));
+                    m.clear(sub);
+                }
             }
         }
     }
@@ -2485,8 +2506,16 @@ private:
 
         if (mSize)
         {
+            size_type oldSize = mSize;
             mSize = 0;
-            insert_move_from(oldBlock, oldLen);
+            if (double(oldSize) > (double(oldLen)/2.0))
+            {
+                insert_move_from<true>(oldBlock, oldLen);
+            }
+            else
+            {
+                insert_move_from<false>(oldBlock, oldLen);
+            }
         }
 
         deallocate_blocks(oldBlock, oldLen);
