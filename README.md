@@ -30,6 +30,7 @@ Add your name somewhere and submit a pull request :)
 The following are additional items that can be worked on:
 * [ ] Optimizations
 * [ ] Statistics and performance reports
+* [ ] Add allocation pool for reference stability for non-movable or large values.
 
 ## Inspiration
 Descriptions of Google's hashmap and Malte Skarupke's bytell hashmap

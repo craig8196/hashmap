@@ -259,14 +259,21 @@ struct fibonacci_hash: public Hash
 #else
     // Error already reported above.
 #endif
-    static constexpr int SHIFT = (sizeof(size_type) * 8) / 2;
+
+#if 0
+    static constexpr int RSHIFT = (sizeof(size_type) * 8) / 2;
+    static constexpr int LSHIFT = (sizeof(size_type) * 8) / 2;
+#else
+    static constexpr int RSHIFT = 13;
+    static constexpr int LSHIFT = (sizeof(size_type) * 8) - RSHIFT;
+#endif
 
     size_type
     operator()(const Key& k)
     const
     {
         size_type result = FIB * Hash::operator()(k);
-        return (result >> SHIFT) | (result << SHIFT);
+        return (result >> RSHIFT) | (result << LSHIFT);
     }
 };
 
