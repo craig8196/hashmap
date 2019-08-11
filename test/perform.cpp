@@ -253,7 +253,13 @@ main(void)
 
     rand_intarr_free(n);
 
-    printf("Done generating random elements.\n");
+    printf("# Done generating random elements.\n");
+    printf("# Format:\n"
+           "# len = number of elements per iteration\n"
+           "# iter = number of iterations\n"
+           "# actionlen = number of actions per element\n"
+           "# ops = total over all runs [ins, ins exist, erase, erase exist, find, find exist]\n"
+           "# seconds = number of seconds\n");
 
     int runlength;
     int counter = 1;
@@ -281,20 +287,13 @@ main(void)
             return errno;
         }
 
+
         double seconds =
             (double)(end.tv_sec - start.tv_sec) 
             + ((double)end.tv_nsec - (double)start.tv_nsec)/1000000000.0;
 
-        int runops = runlength * MAX_ACTIONS;
-        int totalops = runops * maxiter;
-        printf(
-            "Stat: [%d] items [%d] times in "
-            "[%f] seconds or [%f per second/%f nsec per op]\n",
-            runops,
-            maxiter,
-            seconds,
-            ((double)totalops/seconds),
-            (seconds*1000000000.0)/(double)totalops);
+        printf("{\"len\":%d,\"iter\":%d,\"actionlen\":%d,\"ops\":[%d,%d,%d,%d,%d,%d],\"seconds\":%f}\n",
+               runlength, maxiter, MAX_ACTIONS, 0, 0, 0, 0, 0, 0, seconds);
     }
 
     free(e);
