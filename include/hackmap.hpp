@@ -2035,41 +2035,46 @@ private:
     }
 
     size_type
-    find_empty(size_type itail)
+    find_empty(size_type isearch)
     const noexcept
     {
-        itail = (itail + 1) & mMask; // Actually, we can just start after the tail.
-
-        auto block = get_block(itail);
+        auto block = get_block(isearch);
 
 #if 0
         // No apparent speedup.
-        if (UNLIKELY(block->is_empty(itail)))
+        if (UNLIKELY(block->is_empty(isearch)))
         {
-            return itail;
+            return isearch;
         }
 #endif
 
         int isub;
 
-        search_map map = block->find_empty(itail);
+        // Using SSE has been fastest so far.
+        // Loop or switch statement appear to be significantly slower.
+        search_map map = block->find_empty(isearch);
+#if 1
+        // Possible minor speedup, no apparent loss of speed.
+        // Statistics support this being likely.
+        if (LIKELY(map.has()))
+#else
         if (map.has())
+#endif
         {
             isub = map.next();
-            return combine_index(itail, isub);
+            return combine_index(isearch, isub);
         }
 
-        size_type index = (itail + BLOCK_LEN) & mMask;
         for (;;)
         {
-            block = get_block(index);
+            isearch = (isearch + BLOCK_LEN) & mMask;
+            block = get_block(isearch);
             map = block->find_empty();
             if (map.has())
             {
                 isub = map.next();
-                return combine_index(index, isub);
+                return combine_index(isearch, isub);
             }
-            index = (index + BLOCK_LEN) & mMask;
         }
     }
 
@@ -2077,8 +2082,8 @@ private:
     link_empty(size_type ihead, size_type itail, uint8_t& frag)
     noexcept
     {
-        //size_type iempty = find_empty(itail);
-        size_type iempty = find_empty(ihead);
+        //size_type iempty = find_empty((itail + 1) & mMask);
+        size_type iempty = find_empty((ihead + 1) & mMask);
         size_type emptyPos = ((iempty + mLen) - ihead) & mMask;
         size_type nextPos = ((itail + mLen) - ihead) & mMask;
 
