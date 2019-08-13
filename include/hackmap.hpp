@@ -797,6 +797,14 @@ public:
                 {
                     mIndex += 16;
                     block = block_type::get(mBlock, mIndex);
+
+                    // Make sure we don't overshoot our sentinel.
+                    if (!block->is_empty_by_subindex(0))
+                    {
+                        map = search_map(1);
+                        break;
+                    }
+
                     map = block->find_full();
                 }
                 mIndex = block_type::construct_index(mIndex, map.next());
@@ -2384,7 +2392,13 @@ private:
         }
     }
 
-    /** @note Cannot compare subhash with "leap'd to" entry. */
+    /**
+     * @note Cannot compare subhash with "leap'd to" entry.
+     * @warn The reason this function works is because the maximum FIND
+     *       or leap value is >=16. This ensures that we start searching
+     *       outside the block of the leaped from entry and do not encounter
+     *       an infinite loop.
+     */
     size_type
     extended_leap(size_type ihead, size_type ifrom, uint8_t findhash)
     const noexcept
