@@ -171,10 +171,20 @@ public:
     {
         if (mSize && mLen)
         {
-            os << "Max Elements: " << mLen << std::endl;
-            os << "Size: " << mSize << std::endl;
-            os << "Full: " << (double(mSize)/double(mLen)) * 100.0 << "%" << std::endl;
-            os << "Empty: " << (double(mEmpty)/double(mLen)) * 100.0 << "%" << std::endl;
+            os << "Max Elements: "
+               << mLen
+               << std::endl;
+            os << "Size: "
+               << mSize
+               << std::endl;
+            os << "Full: "
+               << (double(mSize)/double(mLen)) * 100.0
+               << "%"
+               << std::endl;
+            os << "Empty: "
+               << (double(mEmpty)/double(mLen)) * 100.0
+               << "%"
+               << std::endl;
 
             if (mRunMax)
             {
@@ -183,7 +193,9 @@ public:
 
             if (mRunCount)
             {
-                os << "Run Avg: " << (double(mRunTotal)/double(mRunCount)) << std::endl;
+                os << "Run Avg: "
+                   << (double(mRunTotal)/double(mRunCount))
+                   << std::endl;
             }
 
             for (size_type i = 0; i < LEN; ++i)
@@ -191,7 +203,12 @@ public:
                 size_type linkdist = mLinkDistances[i];
                 if (linkdist)
                 {
-                    os << "Link " << i << ": " << (double(linkdist)/double(mSize)) * 100.0 << "%" << std::endl;
+                    os << "Link "
+                       << i
+                       << ": "
+                       << (double(linkdist)/double(mSize)) * 100.0
+                       << "%"
+                       << std::endl;
                 }
             }
 
@@ -201,7 +218,11 @@ public:
                 if (leapcount)
                 {
                     size_type leapdist = mLeapDistancesTotal[i];
-                    os << "Leap " << i << ": " << (double(leapdist)/double(leapcount)) << std::endl;
+                    os << "Leap "
+                       << i
+                       << ": "
+                       << (double(leapdist)/double(leapcount))
+                       << std::endl;
                 }
             }
 
@@ -211,7 +232,11 @@ public:
                 if (homecount)
                 {
                     size_type homedist = mHomeDistancesTotal[i];
-                    os << "Home " << i << ": " << (double(homedist)/double(homecount)) << std::endl;
+                    os << "Home "
+                       << i
+                       << ": "
+                       << (double(homedist)/double(homecount))
+                       << std::endl;
                 }
             }
         }
@@ -1945,7 +1970,8 @@ private:
                     {
                         if (!IsUnique && (frag == block->get_hash(index)))
                         {
-                            if (LIKELY(compare_keys(block->get_value(index).first, k)))
+                            if (LIKELY(compare_keys(
+                                            block->get_value(index).first, k)))
                             {
                                 if (DoUpsert)
                                 {
