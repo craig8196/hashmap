@@ -519,7 +519,7 @@ main(void)
         // Move assign with no elements.
         map_edge_type m10;
         map_edge_type m11;
-        m11 = std::move(m11);
+        //m11 = std::move(m11); /* Not allowed by clang compiler */
         m11 = std::move(m10);
 
         cout << "PASSED CONSTRUCTORS TEST" << endl;
