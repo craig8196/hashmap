@@ -267,7 +267,6 @@ template <typename Key, typename Hash = std::hash<Key>>
 struct fibonacci_hash: public Hash
 {
     fibonacci_hash(const Hash& h = Hash{}) : Hash(h) {}
-#pragma message (SIZE_MAX)
 #if HASH_SIZE == 32
     /*
      * (2**32)/(Golden Ratio) ~= 2654435769
