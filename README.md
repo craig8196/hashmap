@@ -7,7 +7,7 @@ Originally, I wanted to create a hashmap in C that used Robinhood Hashing.
 I wasn't happy with my original ideas, design, and performance.
 In short, my early attempts sucked.
 I researched what others have attempted and created a design based on multiple
-ideas.
+ideas, namely Bytell Hashmap by Malte Skarupke and high level descriptions of how Google's Hashmap supposedly works (still haven't seen the source yet).
 The algorithm turned out to be difficult to implement, but I think I've found
 all of the bugs using code-coverage reports and randomized testing.
 In the end I think I've created a competitive hashmap.
